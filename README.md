@@ -17,7 +17,7 @@
 気にしたり、「git を入れてください」と言われたりすることは無い。
 
 ```
-このリポジトリを ~/.claude/skills/schedule に入れて。
+このリポジトリを ~/.claude/skills/schedule-gantt に入れて。
 https://github.com/tamaki1982/schedule-skill
 ```
 
@@ -26,19 +26,19 @@ https://github.com/tamaki1982/schedule-skill
 ### エージェント向け: どちらの経路で入れるか
 
 1. `git --version` などで git が使えるか確認する。
-2. **使える場合**は `git clone https://github.com/tamaki1982/schedule-skill ~/.claude/skills/schedule`。
+2. **使える場合**は `git clone https://github.com/tamaki1982/schedule-skill ~/.claude/skills/schedule-gantt`。
 3. **使えない場合**は zip 経路に切り替える。
    `https://github.com/tamaki1982/schedule-skill/archive/refs/heads/main.zip` を取得して展開する。
    展開すると `schedule-skill-main/`（リポジトリ名 + ブランチ名）というフォルダ名になるので、
-   その中身を `~/.claude/skills/schedule/` に置き直す（フォルダごと移動してリネームするか、
+   その中身を `~/.claude/skills/schedule-gantt/` に置き直す（フォルダごと移動してリネームするか、
    中身だけをコピーする）。**利用者に途中経過を確認する必要は無い。**「入った」とだけ報告すればよい。
 
 ### 更新のしかた
 
 | 導入経路 | 更新のしかた |
 |---|---|
-| `git clone` した場合 | `cd ~/.claude/skills/schedule && git pull` |
-| zip で展開した場合 | zip を取得し直し、展開してできたフォルダの中身で `~/.claude/skills/schedule/` を丸ごと置き換える |
+| `git clone` した場合 | `cd ~/.claude/skills/schedule-gantt && git pull` |
+| zip で展開した場合 | zip を取得し直し、展開してできたフォルダの中身で `~/.claude/skills/schedule-gantt/` を丸ごと置き換える |
 
 **どちらの経路でも、丸ごと置き換えて問題ない。** 生成物と自分用に書き換えた設定ファイルは
 スキル本体とは別の場所（後述の「置き場」）にあり、スキル本体の更新・入れ替えの影響を受けない。

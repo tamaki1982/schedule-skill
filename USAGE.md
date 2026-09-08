@@ -10,7 +10,7 @@
 
 | 呼び方 | 何を指すか |
 |---|---|
-| **SKILL_ROOT** | このリポジトリ自体（`SKILL.md` や `templates/` がある場所。通常は `~/.claude/skills/schedule/`） |
+| **SKILL_ROOT** | このリポジトリ自体（`SKILL.md` や `templates/` がある場所。通常は `~/.claude/skills/schedule-gantt/`） |
 | **置き場** | 生成物と自分用の定義ファイルを置く場所。SKILL_ROOT とは別の場所にあり、スキル本体の更新（`git pull`、または zip の入れ替え）や再配置の影響を受けない |
 
 **このリポジトリ自体には生成物を置かない。** 生成したスケジュール（HTML・JSON）と、自分用に

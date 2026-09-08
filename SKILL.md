@@ -1,5 +1,5 @@
 ---
-name: schedule
+name: schedule-gantt
 description: 依頼者の入力文からプロジェクトのスケジュールを組み立て、単体で開けるHTMLのガントチャートとJSONを出力するスキル。「スケジュール作って」「予定を引いて」「〇〇のスケジュールを作成して」「工程表を作って」といった新規依頼、既存スケジュールの修正依頼（「実装を2週間後ろ倒しして」等）、このツール自体の仕様についての質問（保存の仕組み・印刷・画面の操作範囲など）で使う。
 allowed-tools: Bash(python3 *), AskUserQuestion
 ---
@@ -27,7 +27,7 @@ allowed-tools: Bash(python3 *), AskUserQuestion
 
 | 呼び方 | 何を指すか |
 |---|---|
-| **SKILL_ROOT** | このスキル一式（この `SKILL.md` や `templates/` がある場所。通常は `~/.claude/skills/schedule/`）。clone 先を変えれば物理的な場所も変わる |
+| **SKILL_ROOT** | このスキル一式（この `SKILL.md` や `templates/` がある場所。通常は `~/.claude/skills/schedule-gantt/`）。clone 先を変えれば物理的な場所も変わる |
 | **置き場** | 利用者が選んだ、生成物と自分用の定義ファイルを置く場所。SKILL_ROOT とは別の場所にあり、スキル本体の更新・再インストールの影響を受けない |
 
 **以降、本書で単に `schema/` `templates/` と書いた場合は SKILL_ROOT 配下を指す。単に `output/` と
@@ -62,7 +62,7 @@ allowed-tools: Bash(python3 *), AskUserQuestion
 **置き場が既に確定していて実在も確認できるなら、2周目以降はこの Step をスキップしてよい。**
 
 1. **SKILL_ROOT を決める。**
-   - いま読んでいるこの `SKILL.md` を読み込んだ際の絶対パス（例: `~/.claude/skills/schedule/SKILL.md`）
+   - いま読んでいるこの `SKILL.md` を読み込んだ際の絶対パス（例: `~/.claude/skills/schedule-gantt/SKILL.md`）
      から、その親ディレクトリを SKILL_ROOT とする（`SKILL.md` と `templates/` が同じ階層にある場所）。
    - **環境変数（`${CLAUDE_SKILL_DIR}` 等）には頼らない。** このスキルは `git clone` でそのまま
      配置される配布物であり、そうした変数が用意されない環境でも動く必要があるため、常に
