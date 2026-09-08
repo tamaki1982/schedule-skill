@@ -1316,8 +1316,18 @@
   /* ==========================================================
      印刷 / PDF 出力
      ---------------------------------------------------------
-     開閉状態は画面上の状態なので、印刷直前に全展開してから
-     描画し直す（beforeprint ハンドラ）。以下はその際のレイアウト調整。
+     拡大率・開閉状態は画面で選んだとおりに紙へ出す（書き換えない）。
+     紙に出すべきでない操作系の要素を消す・テーマを固定するといった
+     調整だけを beforeprint ハンドラ（beforePrint()）で行う。
+
+     画面のタイムラインは横スクロールで見る前提なので、紙の幅（A4 横
+     から余白を引いた分）を超えることは普通に起きる。その場合は
+     beforePrint() が全体の縮小率を計算し、.board に zoom で適用する
+     （縦の紙送りは変えない。理由は beforePrint() のコメント参照）。
+     以下の @page ・ .gantt-left/.gantt-axis-left の固定幅は、その
+     縮小率の計算前提として beforePrint() 側の定数と対応させている。
+     どちらかを変えたら、もう片方（PRINT_PAGE_MM / PRINT_LEFT_WIDTH）も
+     直すこと。
      ========================================================== */
   @page { size: A4 landscape; margin: 10mm; }
   @media print {
@@ -1360,7 +1370,11 @@
     .topbar-right { display: none !important; }
     .doc-meta { display: inline !important; }
     .board { border: none; }
-    /* 折りたたみによる行の欠落を防ぐ（描画側でも全展開する） */
+    /* 画面では横スクロール・上部貼り付け（sticky）で見せている領域を、
+       紙では素直に流し込む。overflow を visible に戻さないと、画面の
+       スクロール枠の外側（＝紙の 2 ページ目以降にあたる部分）が
+       スクロール領域の外として切り捨てられてしまう。
+       開閉（折りたたみ）の状態は書き換えない。畳んだ行はここでも畳んだまま。 */
     .gantt-view { overflow: visible !important; }
     .gantt-axis { position: static !important; overflow: visible !important; }
     .gantt-left, .gantt-axis-left { position: static !important; }
@@ -3216,9 +3230,11 @@ function validateDoc(doc) {
 /* ==================================================================
    列レイアウト計算（ズーム 4 段階）
    ================================================================== */
-var ALL_ZOOM_WIDTH_SCREEN = 1100;
-var ALL_ZOOM_WIDTH_PRINT = 560;   /* 右に足す余白のぶん、列の幅を控えめにして A4 横に収める */
-var ALL_ZOOM_WIDTH = ALL_ZOOM_WIDTH_SCREEN;
+/* 「全期間」ズームの基準幅。画面・印刷で共通の値を使う。
+   以前は印刷時だけ狭い値に差し替えていたが、印刷は拡大率を書き換えず
+   全体を縮小して紙幅に収める方式に変えたため（beforePrint 参照）、
+   ここで印刷用に値を分ける必要が無くなった。 */
+var ALL_ZOOM_WIDTH = 1100;
 
 function computeColumns(zoom) {
   var cols = [], i, W, cur, next, nextM, daysInMonth;
@@ -6413,16 +6429,53 @@ function toggleTheme() {
   paintThemeButton();
 }
 
-/* 印刷 / PDF: 折りたたみ状態と拡大率は画面上の状態なので、
-   出力直前に「全展開・全期間」へ切り替え、出力後に元へ戻す。
-   表示領域は画面でも高さを固定していないため、そのまま紙送りされる。
-   出力の対象は表示中のフェーズ 1 本。画面で見えているものがそのまま紙に出る。 */
+/* 印刷 / PDF:
+   拡大率（STATE.zoom）と折りたたみ（STATE.expanded）は画面で選んでいる
+   状態のまま紙に出す。書き換えない。
+
+   以前はここで「全展開・全期間」に切り替えていたが、taka から
+   「画面と違う単位で描画される」「畳んだ行が全部開いて出る」という
+   不具合として報告された（2026-09-08）。画面表示と紙面が食い違うこと
+   自体が不具合、という判断で、状態を書き換えない方針に変えた。
+   ここで行うのは「紙に出すべきでないもの」を消す調整だけ
+   （右ペイン・設定・テーマの固定など）。
+
+   ただし紙は画面と違って横に流れない。画面のタイムラインは横スクロール
+   で見る前提なので、拡大率をそのまま出すと紙の幅（A4 横 - 左右余白）を
+   超えて見切れることが普通に起きる。それを防ぐため、出力対象の実際の
+   横幅を計算し、紙幅に収まらない場合だけ .board 全体を縮小する
+   （縮小率に下限は設けない。taka との合意）。
+
+   縮小は transform: scale ではなく CSS の zoom を使う。
+   transform はペイント（見た目）だけを縮小し、ページ分割は縮小前の
+   レイアウトサイズを基準に計算されるため、縮小後の見た目とページの
+   境目がずれる（ページ途中で切れる／想定より早く改ページする等）。
+   zoom はレイアウトそのもののサイズを変えるため、縮小後のサイズを
+   基準にページが組まれる＝縦の紙送り（複数ページ）と両立できる。
+   （zoom は Chromium 系・Safari で対応、Firefox は 126 以降。
+   このツールの印刷 / PDF 化は Chromium 系を前提にしている） */
 var PRINT_SNAPSHOT = null;
+/* .gantt-left / .gantt-axis-left の @media print ルール（flex: 0 0 250px）
+   と必ず一致させる。DOM 計測ではなく定数にしているのは、print 用の
+   CSS が実際に効いているかを beforeprint の時点で確実には測れないため
+   （ブラウザや発火タイミングによって、print 用スタイルの反映が
+   beforeprint 実行前後のどちらになるか変わり得る）。 */
+var PRINT_LEFT_WIDTH = 250;
+/* @page の値（下の @page 定義）と必ず一致させる。
+   A4 横 297mm、余白 10mm → 印刷可能幅 = 297 - 10*2 = 277mm。
+   @page のサイズや余白を変えたら、ここも合わせて直すこと。 */
+var PRINT_PAGE_MM = { width: 297, margin: 10 };
+var MM_TO_PX = 96 / 25.4;   /* CSS の 1mm = 96/25.4px 換算 */
+/* mm→px の丸め・環境差で数px はみ出す事故を避けるための安全マージン。
+   見た目に影響しない小ささで、狙いは「ちょうど収まったつもりが1pxだけ
+   次ページ/次列にはみ出す」を防ぐこと。 */
+var PRINT_WIDTH_SAFETY_PX = 4;
+function printAvailableWidthPx() {
+  return (PRINT_PAGE_MM.width - PRINT_PAGE_MM.margin * 2) * MM_TO_PX - PRINT_WIDTH_SAFETY_PX;
+}
 function beforePrint() {
   if (PRINT_SNAPSHOT) return;
   PRINT_SNAPSHOT = {
-    expanded: STATE.expanded,
-    zoom: STATE.zoom,
     view: STATE.view,
     settings: STATE.settingsOpen,
     theme: document.documentElement.getAttribute('data-theme'),
@@ -6433,21 +6486,23 @@ function beforePrint() {
   STATE.view = 'timeline';
   STATE.settingsOpen = false;
   applyViewClass();
-  setAllExpanded(true);
-  STATE.zoom = 'all';
-  ALL_ZOOM_WIDTH = ALL_ZOOM_WIDTH_PRINT;
-  render();
+  render();   /* 拡大率・折りたたみはここでは触らない。LAYOUT を最新化するために呼ぶだけ */
+
+  /* 出力対象（名前欄＋タイムライン）の実際の横幅。renderRight/renderAxis が
+     #ganttAxisRight・gantt-right-body に設定する幅と同じ計算（LAYOUT.canvasWidth）。 */
+  var boardWidth = PRINT_LEFT_WIDTH + LAYOUT.canvasWidth;
+  var scale = Math.min(1, printAvailableWidthPx() / boardWidth);
+  var board = document.querySelector('.board');
+  board.style.zoom = scale < 1 ? String(scale) : '';
 }
 function afterPrint() {
   if (!PRINT_SNAPSHOT) return;
-  STATE.expanded = PRINT_SNAPSHOT.expanded;
-  STATE.zoom = PRINT_SNAPSHOT.zoom;
   STATE.view = PRINT_SNAPSHOT.view;
   STATE.settingsOpen = PRINT_SNAPSHOT.settings;
   STATE.drawerOpen = PRINT_SNAPSHOT.drawer;
   applyViewClass();
-  ALL_ZOOM_WIDTH = ALL_ZOOM_WIDTH_SCREEN;
   document.documentElement.setAttribute('data-theme', PRINT_SNAPSHOT.theme);
+  document.querySelector('.board').style.zoom = '';
   PRINT_SNAPSHOT = null;
   render();
 }
