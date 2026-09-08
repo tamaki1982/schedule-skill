@@ -1,0 +1,843 @@
+{
+  "meta": {
+    "schemaVersion": "5.1",
+    "id": "user-community-programs",
+    "title": "ユーザーコミュニティ施策 スケジュール",
+    "groupName": "ユーザーコミュニティ施策",
+    "revision": 1,
+    "generatedAt": "2026-09-05T10:00:00+09:00",
+    "sourceRequest": "秋にユーザー向けのオンライン交流会をやる。開催は10月下旬。あわせて月次のオンライン勉強会も下期分の日程を引きたい。事前の告知から実施報告までのスケジュールを作って",
+    "previousRevisionFile": null,
+    "definitionsVersion": "3.1",
+    "preset": {
+      "id": "event-campaign",
+      "label": "イベント・キャンペーン運営",
+      "version": "1.2"
+    },
+    "assumptions": [
+      "取り組みが2つに分かれているため、プロジェクトを2件に分けた。交流会は単発の開催、勉強会は月次で繰り返す運営で、進め方が別のため。",
+      "2件をまとめた呼び名を「ユーザーコミュニティ施策」とし、表題はそこから組み立てた。どちらのプロジェクト名も使っていない。片方の名前を使うと、もう片方が資料の対象外に見えるため。",
+      "開催日を 2026-10-23 (10月下旬の金曜) に設定した。",
+      "勉強会は下期分として10月・11月・12月の第2金曜に置いた。",
+      "稼働は平日のみ、日本の祝日を休業とした。",
+      "体制はプリセット event-campaign の既定値 (企画1名・制作1名・運営1名) を採用した。2つのプロジェクトで同じ体制を共有している。",
+      "オンライン開催とし、会場手配と設営は工程に含めていない。",
+      "プロジェクト「秋のユーザー交流会」は、事前告知と本開催を別のまとまりとして扱うためフェーズを2件に分け、どちらも進め方の段階で分けるため工程を挟む形にした。",
+      "プロジェクト「月次オンライン勉強会」は、同じ手順を回ごとに繰り返す構成のため、工程を挟まず回ごとのマイルストンを並べた。"
+    ],
+    "notes": "開催日が固定のため、当日の前日を予備日として確保した。勉強会は第3回の前日にも予備日を置いている。初版の生成後、基準日と各タスクの状態を手で更新してある。版数は上げていない。"
+  },
+  "calendar": {
+    "timelineStart": "2026-09-07",
+    "timelineEnd": "2026-12-18",
+    "today": "2026-10-20",
+    "workingDays": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "holidays": [
+      "2026-09-21",
+      "2026-09-23",
+      "2026-10-12",
+      "2026-11-03",
+      "2026-11-23"
+    ]
+  },
+  "display": {
+    "defaultZoom": "week",
+    "defaultExpandLevel": "auto"
+  },
+  "resources": {
+    "roles": [
+      {
+        "id": "role-planner",
+        "label": "企画",
+        "headcount": 1,
+        "capacityPerDay": 0.5
+      },
+      {
+        "id": "role-creative",
+        "label": "制作",
+        "headcount": 1,
+        "capacityPerDay": 0.6
+      },
+      {
+        "id": "role-operator",
+        "label": "運営",
+        "headcount": 1,
+        "capacityPerDay": 0.5
+      }
+    ],
+    "maxParallelTracks": 2
+  },
+  "projects": [
+    {
+      "id": "prj-autumn-meetup",
+      "name": "秋のユーザー交流会",
+      "order": 1,
+      "goal": "利用者との接点をつくる場を1回開き、次回の判断材料まで残す。",
+      "description": "10月下旬に1回だけ開くオンラインの交流会。告知から実施報告までを含む。",
+      "ownerRole": "コミュニティ運営",
+      "startDate": "2026-09-07",
+      "endDate": "2026-11-06",
+      "colorKey": "accent",
+      "phases": [
+        {
+          "id": "ph-precampaign",
+          "name": "事前告知",
+          "order": 1,
+          "goal": "開催内容を固め、対象者に届いている状態にする。",
+          "startDate": "2026-09-07",
+          "endDate": "2026-09-30",
+          "colorKey": "accent",
+          "stages": [
+            {
+              "id": "st-planning",
+              "name": "企画",
+              "order": 1,
+              "goal": "開催内容と進め方を確定する。",
+              "startDate": "2026-09-07",
+              "endDate": "2026-09-11",
+              "colorKey": "accent",
+              "milestones": [
+                {
+                  "id": "ms-concept-fixed",
+                  "name": "企画確定",
+                  "order": 1,
+                  "date": "2026-09-11",
+                  "ownerRole": "企画",
+                  "description": "開催日、対象者、内容が確定し、制作に着手できる状態になる。",
+                  "deliverables": [
+                    "企画書",
+                    "当日の進行案"
+                  ],
+                  "exitCriteria": [
+                    "開催日と開催形式が確定している",
+                    "対象者と定員が決まっている"
+                  ],
+                  "tasks": [
+                    {
+                      "id": "tk-concept-draft",
+                      "name": "企画案の作成",
+                      "order": 1,
+                      "status": "done",
+                      "startDate": "2026-09-07",
+                      "endDate": "2026-09-09",
+                      "durationDays": 3,
+                      "effortDays": 2,
+                      "assigneeRole": "企画",
+                      "progress": 100,
+                      "isCriticalPath": true,
+                      "parallelizable": false
+                    },
+                    {
+                      "id": "tk-concept-review",
+                      "name": "企画内容の確認",
+                      "order": 2,
+                      "status": "done",
+                      "startDate": "2026-09-10",
+                      "endDate": "2026-09-11",
+                      "durationDays": 2,
+                      "effortDays": 1,
+                      "assigneeRole": "企画",
+                      "progress": 100,
+                      "dependsOn": [
+                        {
+                          "taskId": "tk-concept-draft",
+                          "type": "FS",
+                          "lagDays": 0
+                        }
+                      ],
+                      "isCriticalPath": true,
+                      "parallelizable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "st-promotion",
+              "name": "制作・告知",
+              "order": 2,
+              "goal": "告知素材と申込導線を用意し、告知を開始する。",
+              "startDate": "2026-09-14",
+              "endDate": "2026-09-30",
+              "colorKey": "cool",
+              "milestones": [
+                {
+                  "id": "ms-announcement",
+                  "name": "告知開始",
+                  "order": 1,
+                  "date": "2026-09-30",
+                  "ownerRole": "制作",
+                  "description": "告知が配信され、申込を受け付けられる状態になる。",
+                  "deliverables": [
+                    "告知素材一式",
+                    "申込ページ"
+                  ],
+                  "exitCriteria": [
+                    "申込ページが公開されている",
+                    "告知が対象者へ配信されている"
+                  ],
+                  "dependsOn": [
+                    "ms-concept-fixed"
+                  ],
+                  "tasks": [
+                    {
+                      "id": "tk-creative",
+                      "name": "告知素材の制作",
+                      "order": 1,
+                      "status": "done",
+                      "startDate": "2026-09-14",
+                      "endDate": "2026-09-25",
+                      "durationDays": 8,
+                      "effortDays": 6,
+                      "assigneeRole": "制作",
+                      "progress": 100,
+                      "dependsOn": [
+                        {
+                          "taskId": "tk-concept-review",
+                          "type": "FS",
+                          "lagDays": 0
+                        }
+                      ],
+                      "isCriticalPath": true,
+                      "parallelizable": true
+                    },
+                    {
+                      "id": "tk-signup-page",
+                      "name": "申込ページの準備",
+                      "order": 2,
+                      "status": "done",
+                      "startDate": "2026-09-24",
+                      "endDate": "2026-09-29",
+                      "durationDays": 4,
+                      "effortDays": 3,
+                      "assigneeRole": "運営",
+                      "progress": 100,
+                      "dependsOn": [
+                        {
+                          "taskId": "tk-creative",
+                          "type": "SS",
+                          "lagDays": 6
+                        }
+                      ],
+                      "isCriticalPath": true,
+                      "parallelizable": true
+                    },
+                    {
+                      "id": "tk-announce",
+                      "name": "告知の配信",
+                      "order": 3,
+                      "status": "done",
+                      "startDate": "2026-09-30",
+                      "endDate": "2026-09-30",
+                      "durationDays": 1,
+                      "effortDays": 1,
+                      "assigneeRole": "運営",
+                      "progress": 100,
+                      "dependsOn": [
+                        {
+                          "taskId": "tk-signup-page",
+                          "type": "FS",
+                          "lagDays": 0
+                        }
+                      ],
+                      "isCriticalPath": true,
+                      "parallelizable": false
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ph-main-event",
+          "name": "本開催",
+          "order": 2,
+          "goal": "当日を滞りなく実施し、結果を次回に残す。",
+          "startDate": "2026-10-01",
+          "endDate": "2026-11-06",
+          "colorKey": "purple",
+          "stages": [
+            {
+              "id": "st-preparation",
+              "name": "準備",
+              "order": 1,
+              "goal": "当日の進行と資料を整え、通しで確認する。",
+              "startDate": "2026-10-01",
+              "endDate": "2026-10-21",
+              "colorKey": "purple",
+              "milestones": [
+                {
+                  "id": "ms-rehearsal-done",
+                  "name": "リハーサル完了",
+                  "order": 1,
+                  "date": "2026-10-21",
+                  "ownerRole": "運営",
+                  "description": "当日と同じ手順で通し、想定どおり進行できることを確認した状態になる。",
+                  "deliverables": [
+                    "進行台本",
+                    "当日資料一式",
+                    "リハーサル記録"
+                  ],
+                  "exitCriteria": [
+                    "進行台本が確定している",
+                    "配信環境で通し確認ができている"
+                  ],
+                  "dependsOn": [
+                    "ms-announcement"
+                  ],
+                  "tasks": [
+                    {
+                      "id": "tk-program",
+                      "name": "進行台本の作成",
+                      "order": 1,
+                      "status": "done",
+                      "startDate": "2026-10-01",
+                      "endDate": "2026-10-08",
+                      "durationDays": 6,
+                      "effortDays": 4,
+                      "assigneeRole": "企画",
+                      "progress": 100,
+                      "dependsOn": [
+                        {
+                          "taskId": "tk-announce",
+                          "type": "FS",
+                          "lagDays": 0
+                        }
+                      ],
+                      "isCriticalPath": true,
+                      "parallelizable": false
+                    },
+                    {
+                      "id": "tk-materials",
+                      "name": "当日資料の制作",
+                      "order": 2,
+                      "status": "inprogress",
+                      "startDate": "2026-10-09",
+                      "endDate": "2026-10-20",
+                      "durationDays": 7,
+                      "effortDays": 5,
+                      "assigneeRole": "制作",
+                      "progress": 50,
+                      "dependsOn": [
+                        {
+                          "taskId": "tk-program",
+                          "type": "FS",
+                          "lagDays": 0
+                        }
+                      ],
+                      "isCriticalPath": true,
+                      "parallelizable": false
+                    },
+                    {
+                      "id": "tk-rehearsal",
+                      "name": "リハーサル",
+                      "order": 3,
+                      "status": "notstarted",
+                      "startDate": "2026-10-21",
+                      "endDate": "2026-10-21",
+                      "durationDays": 1,
+                      "effortDays": 2,
+                      "assigneeRole": "運営",
+                      "progress": 0,
+                      "dependsOn": [
+                        {
+                          "taskId": "tk-materials",
+                          "type": "FS",
+                          "lagDays": 0
+                        }
+                      ],
+                      "isCriticalPath": true,
+                      "parallelizable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "st-operation",
+              "name": "当日運営",
+              "order": 2,
+              "goal": "開催当日を予定どおり実施する。",
+              "startDate": "2026-10-22",
+              "endDate": "2026-10-23",
+              "colorKey": "warm",
+              "milestones": [
+                {
+                  "id": "ms-event-day",
+                  "name": "開催当日",
+                  "order": 1,
+                  "date": "2026-10-23",
+                  "ownerRole": "運営",
+                  "description": "イベントを実施し、参加者対応を完了する。",
+                  "deliverables": [
+                    "当日の記録",
+                    "参加者一覧"
+                  ],
+                  "exitCriteria": [
+                    "予定した時間内に全プログラムを実施した",
+                    "参加者アンケートを配布した"
+                  ],
+                  "dependsOn": [
+                    "ms-rehearsal-done"
+                  ],
+                  "tasks": [
+                    {
+                      "id": "tk-buffer-eventday",
+                      "name": "予備日",
+                      "order": 1,
+                      "status": "notstarted",
+                      "startDate": "2026-10-22",
+                      "endDate": "2026-10-22",
+                      "durationDays": 1,
+                      "effortDays": 0,
+                      "progress": 0,
+                      "dependsOn": [
+                        {
+                          "taskId": "tk-rehearsal",
+                          "type": "FS",
+                          "lagDays": 0
+                        }
+                      ],
+                      "isBuffer": true,
+                      "isCriticalPath": true,
+                      "parallelizable": false,
+                      "notes": "リハーサルで見つかった修正を当てるための1日。"
+                    },
+                    {
+                      "id": "tk-event-run",
+                      "name": "当日進行",
+                      "order": 2,
+                      "status": "notstarted",
+                      "startDate": "2026-10-23",
+                      "endDate": "2026-10-23",
+                      "durationDays": 1,
+                      "effortDays": 3,
+                      "assigneeRole": "運営",
+                      "progress": 0,
+                      "dependsOn": [
+                        {
+                          "taskId": "tk-buffer-eventday",
+                          "type": "FS",
+                          "lagDays": 0
+                        }
+                      ],
+                      "isCriticalPath": true,
+                      "parallelizable": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "st-review",
+              "name": "振り返り",
+              "order": 3,
+              "goal": "結果をまとめ、次回に引き継げる形にする。",
+              "startDate": "2026-10-26",
+              "endDate": "2026-11-06",
+              "colorKey": "neutral",
+              "milestones": [
+                {
+                  "id": "ms-report-done",
+                  "name": "実施報告完了",
+                  "order": 1,
+                  "date": "2026-11-06",
+                  "ownerRole": "企画",
+                  "description": "参加状況と反応がまとまり、次回の判断材料になる状態になる。",
+                  "deliverables": [
+                    "アンケート集計結果",
+                    "実施報告書"
+                  ],
+                  "exitCriteria": [
+                    "参加者数と回答率が集計されている",
+                    "次回への改善点が3件以上挙がっている"
+                  ],
+                  "dependsOn": [
+                    "ms-event-day"
+                  ],
+                  "tasks": [
+                    {
+                      "id": "tk-survey",
+                      "name": "アンケート集計",
+                      "order": 1,
+                      "status": "notstarted",
+                      "startDate": "2026-10-26",
+                      "endDate": "2026-10-30",
+                      "durationDays": 5,
+                      "effortDays": 3,
+                      "assigneeRole": "運営",
+                      "progress": 0,
+                      "dependsOn": [
+                        {
+                          "taskId": "tk-event-run",
+                          "type": "FS",
+                          "lagDays": 0
+                        }
+                      ],
+                      "parallelizable": false
+                    },
+                    {
+                      "id": "tk-report",
+                      "name": "実施報告書の作成",
+                      "order": 2,
+                      "status": "notstarted",
+                      "startDate": "2026-11-02",
+                      "endDate": "2026-11-06",
+                      "durationDays": 4,
+                      "effortDays": 3,
+                      "assigneeRole": "企画",
+                      "progress": 0,
+                      "dependsOn": [
+                        {
+                          "taskId": "tk-survey",
+                          "type": "FS",
+                          "lagDays": 0
+                        }
+                      ],
+                      "parallelizable": false
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "prj-webinar-series",
+      "name": "月次オンライン勉強会",
+      "order": 2,
+      "goal": "下期の3回を予定どおり開き、毎回の登壇と告知を回す。",
+      "description": "毎月1回のオンライン勉強会。回ごとに同じ手順を繰り返すため、工程を挟まず回をマイルストンとして並べている。",
+      "ownerRole": "コミュニティ運営",
+      "startDate": "2026-09-24",
+      "endDate": "2026-12-11",
+      "colorKey": "cool",
+      "phases": [
+        {
+          "id": "ph-webinar-2h",
+          "name": "下期シリーズ",
+          "order": 1,
+          "goal": "10月・11月・12月の3回を開催する。",
+          "description": "回ごとに、登壇者の確定・告知の配信・当日運営の3つを繰り返す。",
+          "startDate": "2026-09-24",
+          "endDate": "2026-12-11",
+          "colorKey": "cool",
+          "milestones": [
+            {
+              "id": "ms-webinar-01",
+              "name": "第1回 開催",
+              "order": 1,
+              "date": "2026-10-09",
+              "ownerRole": "運営",
+              "description": "10月回を実施し、参加者対応を完了する。",
+              "deliverables": [
+                "当日の記録"
+              ],
+              "exitCriteria": [
+                "予定した時間内に実施した"
+              ],
+              "tasks": [
+                {
+                  "id": "tk-w1-speaker",
+                  "name": "第1回 登壇者の確定",
+                  "order": 1,
+                  "status": "done",
+                  "startDate": "2026-09-24",
+                  "endDate": "2026-09-25",
+                  "durationDays": 2,
+                  "effortDays": 1,
+                  "assigneeRole": "企画",
+                  "progress": 100,
+                  "isCriticalPath": true,
+                  "parallelizable": false
+                },
+                {
+                  "id": "tk-w1-promo",
+                  "name": "第1回 告知の配信",
+                  "order": 2,
+                  "status": "done",
+                  "startDate": "2026-10-01",
+                  "endDate": "2026-10-02",
+                  "durationDays": 2,
+                  "effortDays": 1,
+                  "assigneeRole": "制作",
+                  "progress": 100,
+                  "dependsOn": [
+                    {
+                      "taskId": "tk-w1-speaker",
+                      "type": "FS",
+                      "lagDays": 0
+                    }
+                  ],
+                  "isCriticalPath": true,
+                  "parallelizable": false
+                },
+                {
+                  "id": "tk-w1-run",
+                  "name": "第1回 当日運営",
+                  "order": 3,
+                  "status": "done",
+                  "startDate": "2026-10-09",
+                  "endDate": "2026-10-09",
+                  "durationDays": 1,
+                  "effortDays": 2,
+                  "assigneeRole": "運営",
+                  "progress": 100,
+                  "dependsOn": [
+                    {
+                      "taskId": "tk-w1-promo",
+                      "type": "FS",
+                      "lagDays": 0
+                    }
+                  ],
+                  "isCriticalPath": true,
+                  "parallelizable": false
+                }
+              ]
+            },
+            {
+              "id": "ms-webinar-02",
+              "name": "第2回 開催",
+              "order": 2,
+              "date": "2026-11-13",
+              "ownerRole": "運営",
+              "description": "11月回を実施し、参加者対応を完了する。",
+              "deliverables": [
+                "当日の記録"
+              ],
+              "exitCriteria": [
+                "予定した時間内に実施した"
+              ],
+              "dependsOn": [
+                "ms-webinar-01"
+              ],
+              "tasks": [
+                {
+                  "id": "tk-w2-speaker",
+                  "name": "第2回 登壇者の確定",
+                  "order": 1,
+                  "status": "notstarted",
+                  "startDate": "2026-10-26",
+                  "endDate": "2026-10-27",
+                  "durationDays": 2,
+                  "effortDays": 1,
+                  "assigneeRole": "企画",
+                  "progress": 0,
+                  "dependsOn": [
+                    {
+                      "taskId": "tk-w1-run",
+                      "type": "FS",
+                      "lagDays": 0
+                    }
+                  ],
+                  "isCriticalPath": true,
+                  "parallelizable": false
+                },
+                {
+                  "id": "tk-w2-promo",
+                  "name": "第2回 告知の配信",
+                  "order": 2,
+                  "status": "notstarted",
+                  "startDate": "2026-11-05",
+                  "endDate": "2026-11-06",
+                  "durationDays": 2,
+                  "effortDays": 1,
+                  "assigneeRole": "制作",
+                  "progress": 0,
+                  "dependsOn": [
+                    {
+                      "taskId": "tk-w2-speaker",
+                      "type": "FS",
+                      "lagDays": 0
+                    }
+                  ],
+                  "isCriticalPath": true,
+                  "parallelizable": false
+                },
+                {
+                  "id": "tk-w2-run",
+                  "name": "第2回 当日運営",
+                  "order": 3,
+                  "status": "notstarted",
+                  "startDate": "2026-11-13",
+                  "endDate": "2026-11-13",
+                  "durationDays": 1,
+                  "effortDays": 2,
+                  "assigneeRole": "運営",
+                  "progress": 0,
+                  "dependsOn": [
+                    {
+                      "taskId": "tk-w2-promo",
+                      "type": "FS",
+                      "lagDays": 0
+                    }
+                  ],
+                  "isCriticalPath": true,
+                  "parallelizable": false
+                }
+              ]
+            },
+            {
+              "id": "ms-webinar-03",
+              "name": "第3回 開催",
+              "order": 3,
+              "date": "2026-12-11",
+              "ownerRole": "運営",
+              "description": "12月回を実施し、下期シリーズを完了する。",
+              "deliverables": [
+                "当日の記録",
+                "下期のまとめ"
+              ],
+              "exitCriteria": [
+                "予定した時間内に実施した",
+                "下期3回の参加状況がまとまっている"
+              ],
+              "dependsOn": [
+                "ms-webinar-02"
+              ],
+              "tasks": [
+                {
+                  "id": "tk-w3-speaker",
+                  "name": "第3回 登壇者の確定",
+                  "order": 1,
+                  "status": "notstarted",
+                  "startDate": "2026-11-26",
+                  "endDate": "2026-11-27",
+                  "durationDays": 2,
+                  "effortDays": 1,
+                  "assigneeRole": "企画",
+                  "progress": 0,
+                  "dependsOn": [
+                    {
+                      "taskId": "tk-w2-run",
+                      "type": "FS",
+                      "lagDays": 0
+                    }
+                  ],
+                  "isCriticalPath": true,
+                  "parallelizable": false
+                },
+                {
+                  "id": "tk-w3-promo",
+                  "name": "第3回 告知の配信",
+                  "order": 2,
+                  "status": "notstarted",
+                  "startDate": "2026-12-03",
+                  "endDate": "2026-12-04",
+                  "durationDays": 2,
+                  "effortDays": 1,
+                  "assigneeRole": "制作",
+                  "progress": 0,
+                  "dependsOn": [
+                    {
+                      "taskId": "tk-w3-speaker",
+                      "type": "FS",
+                      "lagDays": 0
+                    }
+                  ],
+                  "isCriticalPath": true,
+                  "parallelizable": false
+                },
+                {
+                  "id": "tk-w3-buffer",
+                  "name": "開催前バッファ",
+                  "order": 3,
+                  "status": "notstarted",
+                  "startDate": "2026-12-10",
+                  "endDate": "2026-12-10",
+                  "durationDays": 1,
+                  "effortDays": 0,
+                  "progress": 0,
+                  "dependsOn": [
+                    {
+                      "taskId": "tk-w3-promo",
+                      "type": "FS",
+                      "lagDays": 0
+                    }
+                  ],
+                  "isBuffer": true,
+                  "isCriticalPath": true,
+                  "parallelizable": false,
+                  "notes": "下期の最終回のため、当日の前日に1日確保した。"
+                },
+                {
+                  "id": "tk-w3-run",
+                  "name": "第3回 当日運営",
+                  "order": 4,
+                  "status": "notstarted",
+                  "startDate": "2026-12-11",
+                  "endDate": "2026-12-11",
+                  "durationDays": 1,
+                  "effortDays": 2,
+                  "assigneeRole": "運営",
+                  "progress": 0,
+                  "dependsOn": [
+                    {
+                      "taskId": "tk-w3-buffer",
+                      "type": "FS",
+                      "lagDays": 0
+                    }
+                  ],
+                  "isCriticalPath": true,
+                  "parallelizable": false
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "risks": [
+    {
+      "id": "risk-signup-shortfall",
+      "description": "告知開始から開催まで約3週間しかなく、申込数が定員に届かない可能性がある。",
+      "impact": "medium",
+      "likelihood": "medium",
+      "mitigation": "告知配信の1週間後に申込状況を確認し、届いていなければ追加の告知を打つ。",
+      "relatedIds": [
+        "tk-announce",
+        "ms-announcement"
+      ]
+    },
+    {
+      "id": "risk-fixed-event-date",
+      "description": "開催日が固定のため、準備の遅れを吸収できるのは前日の予備日1日のみ。",
+      "impact": "high",
+      "likelihood": "low",
+      "mitigation": "リハーサルを開催2日前に置き、修正が必要な場合は予備日で対応する。",
+      "relatedIds": [
+        "tk-buffer-eventday"
+      ]
+    },
+    {
+      "id": "risk-shared-team",
+      "description": "2つのプロジェクトを同じ体制で回しているため、交流会の準備が遅れると勉強会の告知に手が回らなくなる。",
+      "impact": "medium",
+      "likelihood": "medium",
+      "mitigation": "勉強会の登壇者確定と告知配信を、交流会の当日と重ならない週に置く。重なる見込みが立った時点で勉強会側を1週間後ろへ動かす。",
+      "relatedIds": [
+        "prj-autumn-meetup",
+        "prj-webinar-series"
+      ]
+    }
+  ],
+  "changeLog": [
+    {
+      "revision": 1,
+      "date": "2026-09-05",
+      "instruction": "秋にユーザー向けのオンライン交流会をやる。開催は10月下旬。あわせて月次のオンライン勉強会も下期分の日程を引きたい。事前の告知から実施報告までのスケジュールを作って",
+      "summary": "初版作成。プロジェクト2件・フェーズ3件・工程5件・マイルストン8件・タスク22件で構成した。交流会は開催日 2026-10-23 からの逆算で日程を配置し、勉強会は各回の開催日から逆算した。交流会の2フェーズは工程を挟む形、勉強会は工程を挟まない形で構成した。",
+      "changes": []
+    }
+  ]
+}

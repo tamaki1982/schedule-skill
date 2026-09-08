@@ -1,0 +1,579 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schedule-gen.local/schema/schedule.schema.json",
+  "title": "Schedule Document",
+  "description": "1つの HTML が持つスケジュールデータ全体を表す正規データ。プロジェクト > フェーズ > 工程 > マイルストン > タスクの5階層で構成する。工程は省略でき、その場合フェーズの直下にマイルストンを置く4階層になる。どちらの形にするかはフェーズごとに選べる。画面はプロジェクトとフェーズを行として描かず、どちらもプルダウンで選ぶ。一度に描くのは選ばれたプロジェクトの選ばれたフェーズ1つ分だけなので、画面上のツリーは最大3段になる。HTML出力・PDF出力・外部同期はすべてこのドキュメントを唯一の入力とする。タスクを分類する項目は持たない (isBuffer による予備日の区別のみ)。",
+  "type": "object",
+  "required": ["meta", "calendar", "projects"],
+  "additionalProperties": false,
+
+  "properties": {
+    "meta": { "$ref": "#/$defs/meta" },
+    "calendar": { "$ref": "#/$defs/calendar" },
+    "display": { "$ref": "#/$defs/display" },
+    "resources": { "$ref": "#/$defs/resources" },
+    "projects": {
+      "type": "array",
+      "description": "プロジェクトの配列。1つの HTML が複数のプロジェクトを持ち、画面ではプルダウンで切り替える。表示順は order 昇順。4.0 で最上位に追加した層で、3.x までルート直下にあった単数の project と phases[] を置き換える。",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/project" }
+    },
+    "risks": {
+      "type": "array",
+      "description": "スケジュール上のリスク。relatedIds はプロジェクトをまたいで指してよい。",
+      "items": { "$ref": "#/$defs/risk" }
+    },
+    "changeLog": {
+      "type": "array",
+      "description": "改版履歴。ドキュメント全体で1本持つ。revision 昇順で追記のみ行い、既存要素は書き換えない。",
+      "items": { "$ref": "#/$defs/changeLogEntry" }
+    }
+  },
+
+  "$defs": {
+
+    "id": {
+      "type": "string",
+      "description": "英小文字・数字・ハイフンのみで構成する識別子。改版をまたいで不変とする。ドキュメント全体で一意であり、プロジェクトをまたいだ重複も認めない (画面と参照はすべて id 単体で対象を引くため)。-tmp- を含む形は、画面上で追加された要素の仮識別子として予約してある。生成・改版では採番しない。",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "minLength": 2,
+      "maxLength": 64
+    },
+
+    "date": {
+      "type": "string",
+      "description": "ISO 8601 の日付 (YYYY-MM-DD)。時刻・タイムゾーンは持たない。",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+    },
+
+    "nullableDate": {
+      "description": "未定の場合は null。null のタスク・マイルストンは期間未設定として扱う。",
+      "oneOf": [
+        { "$ref": "#/$defs/date" },
+        { "type": "null" }
+      ]
+    },
+
+    "status": {
+      "type": "string",
+      "description": "進み具合。notstarted=未着手 / inprogress=進行中 / done=完了 の3値。4.0 で blocked (停滞) を削除した。3段階はガント上でバーの塗りの濃さとして描き分け、done のタスクは名前に取り消し線を引く。人が入れるのはタスクの値だけで、プロジェクト・フェーズ・工程・マイルストンの値は常に配下から算出する (書かれた値は描画に使わない)。",
+      "enum": ["notstarted", "inprogress", "done"]
+    },
+
+    "colorKey": {
+      "type": "string",
+      "description": "配色の割り当てキー。テンプレート側の配色表と対応させる。用途を問わず共通の抽象名とし、意味のある名前を持たせない。持つのはプロジェクト・フェーズ・工程の3階層だけ。マイルストンとタスクは持たない (マイルストンは親の色を継ぎ、タスクのバーの色はドキュメント全体で1種類とし、display.barColorKey で選ぶ。要素ごとには持たず、濃さだけが status で変わる)。プロジェクトとフェーズの colorKey は、ツリーの行ではなく切替のプルダウンでの色分けに使う (任意)。5値しかないため、1ドキュメント内で別々の要素が同じ色になることがある。色は要素を識別するためのものではなく群を見分けるためのものであり、識別は名称が担う。同じ親の中で隣り合う要素には、できるだけ異なるキーを割り当てる。",
+      "enum": ["accent", "cool", "warm", "purple", "neutral"]
+    },
+
+    "meta": {
+      "type": "object",
+      "description": "ドキュメント自身のメタ情報。プロジェクト個々の情報ではなく、この HTML 1枚についての情報を持つ。",
+      "required": ["schemaVersion", "id", "title", "revision", "generatedAt"],
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "type": "string",
+          "description": "本スキーマのバージョン。現行は 5.2。メジャー番号が変わる場合は既存出力の手直しが必要。5.2 で calendar.exceptionalWorkingDays と display の3項目 (allowNonWorkingDayPlacement / nonWorkingDayShading / barColorKey) を足した。いずれも任意項目で、省略時の挙動は 5.1 と完全に同じであるため、5.1 のデータはそのまま読める。5.1 で meta.groupName (任意) を足した。後方互換であり、5.0 のデータはそのまま読める。5.0 では meta.subtitle を削除した (画面にも紙にも出ない項目は、中身が実態とずれても誰も気づかないため)。4.0 のデータを通すには subtitle の行を削る。4.0 では (1) ルート直下の project と phases[] を projects[] に置き換え、(2) status から blocked を落とし、タスク以外では任意項目にした。移行の手順は仕様書 第9章にある。仕様書の版数とは独立して採番する。",
+          "pattern": "^\\d+\\.\\d+$"
+        },
+        "id": {
+          "$ref": "#/$defs/id",
+          "description": "ドキュメント識別子。出力ディレクトリ名・ファイル名の接頭辞に用いる。改版しても変えない。複数プロジェクトを束ねる場合は、その束を表す名前にする (個々のプロジェクト名にしない)。"
+        },
+        "title": {
+          "type": "string",
+          "description": "この HTML 1枚の呼び名。ブラウザのタブと印刷にだけ出し、画面には出さない。人が自由に書く項目ではなく、階層から機械的に組み立てる。projects が1件なら「<projects[0].name> スケジュール」、2件以上なら「<meta.groupName> スケジュール」。区切りは半角スペース1つ、接尾語は「スケジュール」で固定。組み立て結果と一致しているかは不変条件 C18 で判定する。",
+          "minLength": 1
+        },
+        "groupName": {
+          "type": "string",
+          "description": "複数のプロジェクトをまとめて何と呼ぶか。projects が2件以上のときだけ書き、1件のときは書かない (不変条件 C19)。階層から自動では導けない唯一の名前であり、人 (生成時は AI) が決める。中の1つのプロジェクト名を使わない (使うと、残りが資料の対象外に見える)。meta.title 経由でタブと印刷に出るため、実態とずれれば気づける。",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "integer",
+          "description": "改版番号。初版は 1 とし、AI への修正指示ごとに 1 ずつ加算する。画面上の編集と JSON の直接編集では上げない。画面には出さず、印刷にだけ出す。",
+          "minimum": 1
+        },
+        "generatedAt": {
+          "type": "string",
+          "description": "生成時刻 (ISO 8601 date-time)。calendar.today とは別物で、一致していなくてよい (生成した日と開いた日は普通ずれる)。",
+          "format": "date-time"
+        },
+        "sourceRequest": {
+          "type": "string",
+          "description": "生成の元になった入力文。初版では最初の依頼文、改版では最新の修正指示文を保持する。設定ファイルビューに出るため、社外へ渡す HTML では中身に注意する。"
+        },
+        "previousRevisionFile": {
+          "description": "直前の版の JSON ファイル名。初版は null。",
+          "oneOf": [{ "type": "string" }, { "type": "null" }]
+        },
+        "definitionsVersion": {
+          "type": "string",
+          "description": "生成時に参照した共通定義ファイル群のバージョン。definitions/00-index.md の版数と一致させる。"
+        },
+        "preset": {
+          "$ref": "#/$defs/presetRef",
+          "description": "採用したプリセット。どの用途の基準で組み立てたかを出力に残す。1ドキュメントにつき1つ。"
+        },
+        "assumptions": {
+          "type": "array",
+          "description": "入力から読み取れず、定義ファイルまたは推定で埋めた前提。設定ファイルビューに出るため、社外へ渡す HTML では中身に注意する。",
+          "items": { "type": "string" }
+        },
+        "notes": {
+          "type": "string",
+          "description": "自由記述の補足。"
+        }
+      }
+    },
+
+    "presetRef": {
+      "type": "object",
+      "description": "生成に使用したプリセットの参照。definitions/presets/<id>/00-preset.md の宣言と一致させる。",
+      "required": ["id"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id",
+          "description": "プリセット識別子。definitions/presets/ 配下のディレクトリ名と一致させる。"
+        },
+        "label": { "type": "string", "description": "プリセットの表示名。" },
+        "version": { "type": "string", "description": "プリセットの版数。", "pattern": "^\\d+\\.\\d+$" }
+      }
+    },
+
+    "project": {
+      "type": "object",
+      "description": "最上位の区切り。1つの取り組みのまとまりを表し、その中にフェーズを持つ。1つの HTML が複数のプロジェクトを持つ場合、画面ではプルダウンで切り替えて1つずつ見る。ツリーの行にはならない。",
+      "required": ["id", "name", "order", "phases"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id",
+          "description": "接頭辞 prj- を付ける。例: prj-internal-portal"
+        },
+        "name": { "type": "string", "minLength": 1, "description": "切替のプルダウンに出る名前。" },
+        "order": { "type": "integer", "description": "切替のプルダウンでの表示順。ドキュメントの中で 1 起点の連番。", "minimum": 1 },
+        "code": { "type": "string", "description": "外部システム上のプロジェクトコード。画面には出さない。" },
+        "status": {
+          "$ref": "#/$defs/status",
+          "description": "任意。書かれていても描画には使わない。表示に使う状態は常に配下フェーズから算出する。"
+        },
+        "goal": { "type": "string", "description": "このプロジェクトで達成する状態を一文で表す。" },
+        "description": { "type": "string" },
+        "ownerRole": { "type": "string", "description": "責任を持つ役割名。個人名は保持しない。" },
+        "startDate": {
+          "$ref": "#/$defs/nullableDate",
+          "description": "想定として宣言する開始日。描画に使う期間は、宣言の有無にかかわらず常に配下から算出する。宣言値は配下の実期間との比較にだけ使い、食い違う場合ははみ出しとして示す。"
+        },
+        "endDate": {
+          "$ref": "#/$defs/nullableDate",
+          "description": "想定として宣言する終了日。描画に使う期間は、宣言の有無にかかわらず常に配下から算出する。宣言値は配下の実期間との比較にだけ使い、食い違う場合ははみ出しとして示す。"
+        },
+        "colorKey": { "$ref": "#/$defs/colorKey" },
+        "phases": {
+          "type": "array",
+          "description": "配下のフェーズ。表示順は order 昇順。1件以上。",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/phase" }
+        }
+      }
+    },
+
+    "calendar": {
+      "type": "object",
+      "description": "稼働日の定義と、ドキュメント全体の描画範囲。ドキュメントに1つだけ持ち、プロジェクトごとには持たない。",
+      "required": ["timelineStart", "timelineEnd", "today"],
+      "additionalProperties": false,
+      "properties": {
+        "timelineStart": {
+          "$ref": "#/$defs/date",
+          "description": "ドキュメント全体の左端。全プロジェクトの全タスクの最早開始日以前とする。画面の横軸には直接使わない (横軸は表示中フェーズの期間を月境界に丸めた範囲になる)。"
+        },
+        "timelineEnd": {
+          "$ref": "#/$defs/date",
+          "description": "ドキュメント全体の右端。全プロジェクトの全タスクの最遅終了日以降とする。"
+        },
+        "today": {
+          "$ref": "#/$defs/date",
+          "description": "基準日。今日線・初期表示の判定・「今日へ」の行き先に用いる。生成時は生成日を書くが、その後に開いた日へ更新されうる。meta.generatedAt と一致していなくてよい。"
+        },
+        "workingDays": {
+          "type": "array",
+          "description": "稼働曜日。0=日曜, 1=月曜, ... 6=土曜。既定は平日 [1,2,3,4,5]。ドキュメント全体に効く。",
+          "items": { "type": "integer", "minimum": 0, "maximum": 6 },
+          "uniqueItems": true,
+          "default": [1, 2, 3, 4, 5]
+        },
+        "holidays": {
+          "type": "array",
+          "description": "稼働曜日のうち休業とする日付。日数計算と、日単位ズームでの背景色に反映する。",
+          "items": { "$ref": "#/$defs/date" },
+          "uniqueItems": true
+        },
+        "exceptionalWorkingDays": {
+          "type": "array",
+          "description": "例外稼働日。workingDays に含まれない曜日であっても、holidays に載っている日であっても、この計画ではその日だけ稼働日として扱う。holidays より優先する (両方に同じ日付があれば稼働日)。稼働日の定義は ( workingDays に含まれる曜日 かつ holidays に含まれない日 ) ∪ exceptionalWorkingDays であり、日数計算 (durationDays)・日付の妥当性・日単位ズームでの背景色のすべてがこの定義を参照する。省略時は空とみなし、その場合の挙動は本項目が無かった頃と完全に同じ。画面で非稼働日に日程を置いたとき、生成時に依頼文へ根拠があるとき、および手で書いたときに増える。画面の操作では減らない (直前の操作の取り消しを除く)。",
+          "items": { "$ref": "#/$defs/date" },
+          "uniqueItems": true
+        }
+      }
+    },
+
+    "display": {
+      "type": "object",
+      "description": "HTML を開いた直後の見え方。データの中身には影響しない。画面は一度に1つのプロジェクトの1つのフェーズだけを表示し、どちらも利用者の操作で切り替える。",
+      "additionalProperties": false,
+      "properties": {
+        "defaultZoom": {
+          "type": "string",
+          "description": "横軸の初期粒度。all は表示中フェーズの範囲 (そのフェーズの算出期間を月境界に丸めたもの) の全体を1画面に収める指定であり、ドキュメント全体を指すものではない。",
+          "enum": ["all", "month", "week", "day"],
+          "default": "week"
+        },
+        "defaultProjectId": {
+          "description": "開いた直後に表示するプロジェクトの id。projects[] のいずれかの id と一致すること。省略または null の場合、および実在しない id を指していた場合は、描画側が today を基準に選ぶ。defaultPhaseId が実在するフェーズを指している場合は、そのフェーズを持つプロジェクトが優先され、この指定は使われない。",
+          "oneOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }]
+        },
+        "defaultPhaseId": {
+          "description": "開いた直後に表示するフェーズの id。どれか1つのプロジェクトのフェーズの id と一致すること。id はドキュメント全体で一意なので、どのプロジェクトのものかを添える必要はない。省略・null・実在しない id のいずれの場合も、描画側が today を基準に選ぶ。全プロジェクトや全フェーズを一度に表示する指定は用意しない。",
+          "oneOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }]
+        },
+        "defaultExpandLevel": {
+          "type": "string",
+          "description": "左パネルのツリーの初期状態。判定は表示中のフェーズの内側だけで完結し、表示していないフェーズやプロジェクトには適用しない。3値のいずれでもマイルストン行は必ずすべて見えている (マイルストンが1つも見えない状態を作らないため)。milestone は工程行 (あれば) とマイルストン行だけが見えている状態で、画面の「タスクを畳む」の到達点と同じ。task は表示中フェーズのすべての行が見えている状態で、「タスクまで開く」の到達点と同じ。auto は milestone の状態を基点に、today が期間 (配下タスクの最早開始日〜最遅終了日、および配下マイルストンの期日を含む範囲) に含まれるマイルストンだけをタスク行まで開く。表示中フェーズに該当が無い場合は、そのフェーズの中で today 以降に最も早く始まるマイルストンを1件だけ開く。既定は auto。",
+          "enum": ["auto", "milestone", "task"],
+          "default": "auto"
+        },
+        "allowNonWorkingDayPlacement": {
+          "type": "boolean",
+          "description": "画面で日程を動かしたときに、非稼働日にも置けるようにするか。false (既定) では、非稼働日に落ちた日付を直近の稼働日へ寄せる。true では寄せずにその日へ置き、あわせてその期間に含まれる非稼働日を calendar.exceptionalWorkingDays へ足す (置いた日が営業日として数えられるようにするため)。検証はこの項目を参照しない。データの妥当性を左右するのは calendar.exceptionalWorkingDays のほうであり、本項目は画面の操作の振る舞いだけを決める。省略時は false。",
+          "default": false
+        },
+        "nonWorkingDayShading": {
+          "type": "boolean",
+          "description": "日単位ズームで、非稼働日の列に背景色を出すか。既定は true。false にしても日ごとの区切り線・今日の線・カーソルのある列の塗りは残り、日程の計算には一切影響しない。色を出す対象は曜日ではなく非稼働日であり、calendar.exceptionalWorkingDays に載っている日には色を出さない (その日は稼働日であり、営業日として数えられるため)。",
+          "default": true
+        },
+        "barColorKey": {
+          "$ref": "#/$defs/colorKey",
+          "description": "タスクのバーの基準色。colorKey と同じ5値を使い、新しい色の語彙を作らない。既定は accent (薄い黄色)。指定するのは基準の1色だけで、未着手・進行中・完了の3段階は塗りの濃さとして基準色から導出する (3色を個別に指定させない)。予備日の無彩色の斜線、集約の括弧、マイルストンの旗の赤、今日の目印の青は、この指定の対象外。",
+          "default": "accent"
+        }
+      }
+    },
+
+    "resources": {
+      "type": "object",
+      "description": "稼働の前提。プリセットの体制定義を出力に固定して残すための領域。ドキュメントに1つだけ持ち、プロジェクトごとには持たない。担当役割を画面で選ぶときの選択肢になる。",
+      "additionalProperties": false,
+      "properties": {
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "label"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "$ref": "#/$defs/id" },
+              "label": { "type": "string", "description": "画面表示名。個人名ではなく役割名を入れる。" },
+              "headcount": { "type": "number", "description": "この役割に割り当てられる人数。", "minimum": 0 },
+              "capacityPerDay": {
+                "type": "number",
+                "description": "1稼働日あたりの実働係数。1.0 = 1人日をまるごと当該案件に使える状態。",
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          }
+        },
+        "maxParallelTracks": {
+          "type": "integer",
+          "description": "同時に走らせられる作業本数の上限。スケジュール生成時の並行度の上限として使う。",
+          "minimum": 1
+        }
+      }
+    },
+
+    "phase": {
+      "type": "object",
+      "description": "プロジェクト内の大きな区切り。初期開発・リニューアル・有料プラン対応といった括りを表す。配下の持ち方は2通りあり、stages (工程を挟む形) と milestones (工程を挟まない形) のどちらか一方だけを持つ。両方を持つことも、どちらも持たないこともできない。進め方の段階で分けたいフェーズは stages、機能や対象物で括りたいフェーズは milestones を使う。1つのプロジェクトの中で、フェーズごとに違う形を選んでよい。フェーズはツリーの行にならず、プルダウンで選ぶ。",
+      "required": ["id", "name", "order"],
+      "additionalProperties": false,
+      "oneOf": [
+        { "required": ["stages"] },
+        { "required": ["milestones"] }
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id",
+          "description": "接頭辞 ph- を付ける。例: ph-initial-development"
+        },
+        "name": { "type": "string", "minLength": 1 },
+        "order": { "type": "integer", "description": "所属プロジェクトの中での表示順。1 起点の連番。", "minimum": 1 },
+        "status": {
+          "$ref": "#/$defs/status",
+          "description": "任意。書かれていても描画には使わない。表示に使う状態は常に配下から算出する。"
+        },
+        "goal": { "type": "string", "description": "このフェーズで達成する状態を一文で表す。" },
+        "description": { "type": "string" },
+        "startDate": {
+          "$ref": "#/$defs/nullableDate",
+          "description": "想定として宣言する開始日。描画に使う期間は、宣言の有無にかかわらず常に配下から算出する。宣言値は配下の実期間との比較にだけ使い、食い違う場合ははみ出しとして示す。"
+        },
+        "endDate": {
+          "$ref": "#/$defs/nullableDate",
+          "description": "想定として宣言する終了日。描画に使う期間は、宣言の有無にかかわらず常に配下から算出する。宣言値は配下の実期間との比較にだけ使い、食い違う場合ははみ出しとして示す。"
+        },
+        "colorKey": { "$ref": "#/$defs/colorKey" },
+        "stages": {
+          "type": "array",
+          "description": "配下の工程 (工程を挟む形)。表示順は order 昇順。milestones と同時には持てない。",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/stage" }
+        },
+        "milestones": {
+          "type": "array",
+          "description": "フェーズ直下のマイルストン (工程を挟まない形)。表示順は order 昇順。stages と同時には持てない。工程で区切ると同じ工程名が何度も並んで縦に長くなる場合に、この形を使う。",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/milestone" }
+        }
+      }
+    },
+
+    "stage": {
+      "type": "object",
+      "description": "フェーズ内の作業のまとまり。設計・実装・検証、企画・制作・告知といった、進め方の段階を表す。省略できる層であり、工程を挟まないフェーズではこの層自体が存在しない。",
+      "required": ["id", "name", "order", "milestones"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id",
+          "description": "接頭辞 st- を付ける。例: st-design"
+        },
+        "name": { "type": "string", "minLength": 1 },
+        "order": { "type": "integer", "description": "フェーズ内での表示順。1 起点の連番。", "minimum": 1 },
+        "status": {
+          "$ref": "#/$defs/status",
+          "description": "任意。書かれていても描画には使わない。表示に使う状態は常に配下から算出する。"
+        },
+        "goal": { "type": "string", "description": "この工程で達成する状態を一文で表す。" },
+        "description": { "type": "string" },
+        "startDate": {
+          "$ref": "#/$defs/nullableDate",
+          "description": "想定として宣言する開始日。描画に使う期間は、宣言の有無にかかわらず常に配下から算出する。宣言値は配下の実期間との比較にだけ使い、食い違う場合ははみ出しとして示す。"
+        },
+        "endDate": {
+          "$ref": "#/$defs/nullableDate",
+          "description": "想定として宣言する終了日。描画に使う期間は、宣言の有無にかかわらず常に配下から算出する。宣言値は配下の実期間との比較にだけ使い、食い違う場合ははみ出しとして示す。"
+        },
+        "colorKey": { "$ref": "#/$defs/colorKey" },
+        "milestones": {
+          "type": "array",
+          "description": "配下のマイルストン。表示順は order 昇順。",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/milestone" }
+        }
+      }
+    },
+
+    "milestone": {
+      "type": "object",
+      "description": "到達点。配下のタスクが完了すると迎える期日を表す。ガント上では親行として集約の括弧と期日の旗の両方を描画する。親は工程、工程を挟まないフェーズではフェーズになる。",
+      "required": ["id", "name", "order", "date", "tasks"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id",
+          "description": "接頭辞 ms- を付ける。例: ms-requirements-fixed"
+        },
+        "name": { "type": "string", "minLength": 1 },
+        "order": { "type": "integer", "minimum": 1 },
+        "status": {
+          "$ref": "#/$defs/status",
+          "description": "任意。書かれていても描画には使わない。表示に使う状態は常に配下タスクから算出する (すべて done なら完了とみなし、名前に取り消し線を引く)。"
+        },
+        "date": {
+          "$ref": "#/$defs/nullableDate",
+          "description": "到達目標日。単一日付。null の場合は期間未設定として、ガント上は旗を持たない行として扱う。"
+        },
+        "ownerRole": { "type": "string", "description": "到達責任を持つ役割名。" },
+        "description": { "type": "string" },
+        "deliverables": {
+          "type": "array",
+          "description": "この時点で存在すべき成果物。",
+          "items": { "type": "string" }
+        },
+        "exitCriteria": {
+          "type": "array",
+          "description": "到達判定の条件。",
+          "items": { "type": "string" }
+        },
+        "dependsOn": {
+          "type": "array",
+          "description": "先行するマイルストンの id。プロジェクトをまたいで指してよい。",
+          "items": { "$ref": "#/$defs/id" },
+          "uniqueItems": true
+        },
+        "progress": {
+          "type": "integer",
+          "description": "達成率 (0-100)。描画に使う値は常に配下タスクの progress を effortDays で加重平均して算出し、ここに書かれた値は使わない。Phase 1 では画面に表示しない。",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "tasks": {
+          "type": "array",
+          "description": "このマイルストンに到達するために必要な作業。表示順は order 昇順。",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/task" }
+        }
+      }
+    },
+
+    "task": {
+      "type": "object",
+      "description": "期間を持つ最小の作業単位。ガント上では横棒として描画する。分類を表す項目は持たず、名前だけで何の作業かが分かるように命名する。status を人が入れる唯一の階層で、上位の状態はここから算出される。",
+      "required": ["id", "name", "order", "status", "startDate", "endDate"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id",
+          "description": "接頭辞 tk- を付ける。例: tk-requirements-survey"
+        },
+        "name": {
+          "type": "string",
+          "description": "作業名。画面に出る主な手がかりであるため、対象を含めて名前だけで意味が通る形にする。例: 「要件調査」ではなく「バーチャルオフィス 要件調査」。",
+          "minLength": 1
+        },
+        "order": { "type": "integer", "minimum": 1 },
+        "status": {
+          "$ref": "#/$defs/status",
+          "description": "必須。ガント上ではバーの塗りの濃さとして3段階に描き分け、done の場合は名前に取り消し線を引く。画面から切り替えられるのはこの階層だけ。"
+        },
+        "startDate": {
+          "$ref": "#/$defs/nullableDate",
+          "description": "開始日。稼働日であること。null の場合は endDate も null とし、期間未設定として扱う。"
+        },
+        "endDate": {
+          "$ref": "#/$defs/nullableDate",
+          "description": "終了日。開始日を含む閉区間の右端で、稼働日であること。startDate 以上であること。"
+        },
+        "durationDays": {
+          "type": "integer",
+          "description": "startDate から endDate までに含まれる稼働日数。画面では「営業日」と呼ぶ。",
+          "minimum": 0
+        },
+        "effortDays": {
+          "type": "number",
+          "description": "投入工数 (人日)。durationDays とは独立。2人で5稼働日なら durationDays=5, effortDays=10。画面では「概算工数 (AI算出)」として読み取り専用で出す。",
+          "minimum": 0
+        },
+        "assigneeRole": {
+          "type": "string",
+          "description": "担当する役割名。個人名は保持しない。resources.roles の label と揃える。"
+        },
+        "progress": {
+          "type": "integer",
+          "description": "進捗率 (0-100)。Phase 1 では画面に表示しない。Phase 2 で使う。",
+          "minimum": 0,
+          "maximum": 100,
+          "default": 0
+        },
+        "dependsOn": {
+          "type": "array",
+          "description": "先行タスク。日程の妥当性検証と、リスケジュール時の連動範囲の判定に用いる。プロジェクトをまたいで指してよい。",
+          "items": { "$ref": "#/$defs/dependency" }
+        },
+        "isBuffer": {
+          "type": "boolean",
+          "description": "予備日 (バッファ) かどうか。true のタスクは遅延吸収用で、effortDays は 0、assigneeRole は付けない。独立したタスクとして置き、ガント上は無彩色の斜線で描く (status による濃さの差は付けない)。タスクを分類する唯一の項目。",
+          "default": false
+        },
+        "isCriticalPath": {
+          "type": "boolean",
+          "description": "クリティカルパス上にあるかどうか。true のタスクは遅延がそのまま最終日に波及する。Phase 1 では画面に表示しない。",
+          "default": false
+        },
+        "parallelizable": {
+          "type": "boolean",
+          "description": "他タスクと並行して進められるかどうか。false の場合は直列に配置する。生成時の判断に使う値で、画面には出さない。",
+          "default": true
+        },
+        "notes": { "type": "string" }
+      }
+    },
+
+    "dependency": {
+      "type": "object",
+      "description": "タスク間の依存関係。",
+      "required": ["taskId"],
+      "additionalProperties": false,
+      "properties": {
+        "taskId": { "$ref": "#/$defs/id" },
+        "type": {
+          "type": "string",
+          "description": "依存の種類。FS=先行終了後に開始 / SS=同時開始 / FF=同時終了 / SF=先行開始後に終了。タスクの分類 (種別) とは別物。",
+          "enum": ["FS", "SS", "FF", "SF"],
+          "default": "FS"
+        },
+        "lagDays": {
+          "type": "integer",
+          "description": "依存を満たしたうえで空ける稼働日数。負値で前倒しの重なりを表す。",
+          "default": 0
+        }
+      }
+    },
+
+    "risk": {
+      "type": "object",
+      "required": ["id", "description"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "description": { "type": "string" },
+        "impact": { "type": "string", "enum": ["low", "medium", "high"] },
+        "likelihood": { "type": "string", "enum": ["low", "medium", "high"] },
+        "mitigation": { "type": "string", "description": "顕在化した場合の対処方針。" },
+        "relatedIds": {
+          "type": "array",
+          "description": "関連するプロジェクト・フェーズ・工程・マイルストン・タスクの id。",
+          "items": { "$ref": "#/$defs/id" }
+        }
+      }
+    },
+
+    "changeLogEntry": {
+      "type": "object",
+      "description": "1回の改版で行った変更の記録。",
+      "required": ["revision", "date", "summary"],
+      "additionalProperties": false,
+      "properties": {
+        "revision": { "type": "integer", "minimum": 1 },
+        "date": { "$ref": "#/$defs/date" },
+        "instruction": { "type": "string", "description": "受け取った修正指示の原文。" },
+        "summary": { "type": "string", "description": "変更内容の要約。" },
+        "changes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["op", "targetId"],
+            "additionalProperties": false,
+            "properties": {
+              "op": {
+                "type": "string",
+                "description": "add=追加 / remove=削除 / update=属性変更 / reschedule=日程変更。",
+                "enum": ["add", "remove", "update", "reschedule"]
+              },
+              "targetId": { "$ref": "#/$defs/id" },
+              "field": { "type": "string" },
+              "before": {},
+              "after": {}
+            }
+          }
+        }
+      }
+    }
+  }
+}

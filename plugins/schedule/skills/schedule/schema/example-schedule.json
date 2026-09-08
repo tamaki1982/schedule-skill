@@ -1,0 +1,960 @@
+{
+  "meta": {
+    "schemaVersion": "5.1",
+    "id": "portal-virtual-office",
+    "title": "バーチャルオフィス機能追加 スケジュール",
+    "revision": 1,
+    "generatedAt": "2026-09-05T10:00:00+09:00",
+    "sourceRequest": "社内ポータルにバーチャルオフィス機能を追加する。リリースは11月中目標のため逆算してスケジュールを作って",
+    "previousRevisionFile": null,
+    "definitionsVersion": "3.1",
+    "preset": {
+      "id": "software-development",
+      "label": "ソフトウェア開発",
+      "version": "1.2"
+    },
+    "assumptions": [
+      "プロジェクトは1件とした。依頼が1つの取り組みに閉じているため。",
+      "プロジェクト名は「バーチャルオフィス機能追加」とした。プロジェクトは取り組みそのものを表す層であり、土台となる製品名（社内ポータル）ではないため。製品名は説明に残した。",
+      "本番公開日を 2026-11-27 (11月最終営業週の金曜) に設定した。",
+      "稼働は平日のみ、日本の祝日を休業とした。",
+      "体制はプリセット software-development の既定値 (実装2名・デザイン1名・検証1名・プロダクト管理1名) を採用した。",
+      "リアルタイム通信基盤は既存基盤の上に新規構築する想定で見積もり、該当タスクに新規技術要素の倍率 1.3 を適用した。",
+      "既存機能への影響範囲は限定的であるとみなし、回帰テストは受け入れテストに内包した。",
+      "フェーズ「初期開発」は進め方の段階で分けたいため、設計・実装・検証と公開の3工程を挟む形にした。",
+      "フェーズ「機能拡張」は機能ごとに同じ手順を繰り返す構成のため、工程を挟まずマイルストンを機能単位で並べた。工程で区切ると同じ工程名が3回並び、行数が2倍近くになるため。",
+      "フェーズ「機能拡張」は目標日が確定していないため、バッファを置かずに前向きに積んだ。"
+    ],
+    "notes": "公開目標が固定のため、実装工程末と公開直前の2か所にバッファを配置した。工程を挟む形と挟まない形を1本のドキュメント内で併用している。初版の生成後、基準日と各タスクの状態を手で更新してある。版数は上げていない。"
+  },
+  "calendar": {
+    "timelineStart": "2026-09-07",
+    "timelineEnd": "2026-12-25",
+    "today": "2026-10-20",
+    "workingDays": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "holidays": [
+      "2026-09-21",
+      "2026-09-23",
+      "2026-10-12",
+      "2026-11-03",
+      "2026-11-23"
+    ]
+  },
+  "display": {
+    "defaultZoom": "week",
+    "defaultPhaseId": "ph-initial-development",
+    "defaultExpandLevel": "auto"
+  },
+  "resources": {
+    "roles": [
+      {
+        "id": "role-pm",
+        "label": "プロダクト管理",
+        "headcount": 1,
+        "capacityPerDay": 0.4
+      },
+      {
+        "id": "role-design",
+        "label": "デザイン",
+        "headcount": 1,
+        "capacityPerDay": 0.5
+      },
+      {
+        "id": "role-backend",
+        "label": "バックエンド実装",
+        "headcount": 1,
+        "capacityPerDay": 0.8
+      },
+      {
+        "id": "role-frontend",
+        "label": "フロントエンド実装",
+        "headcount": 1,
+        "capacityPerDay": 0.8
+      },
+      {
+        "id": "role-qa",
+        "label": "検証",
+        "headcount": 1,
+        "capacityPerDay": 0.6
+      }
+    ],
+    "maxParallelTracks": 3
+  },
+  "projects": [
+    {
+      "id": "prj-virtual-office",
+      "name": "バーチャルオフィス機能追加",
+      "order": 1,
+      "goal": "バーチャルオフィス機能を公開し、その後の拡張まで進める。",
+      "description": "社内の業務ポータルに追加する新機能。既存の基盤の上に実装する。",
+      "ownerRole": "プロダクト責任者",
+      "startDate": "2026-09-07",
+      "endDate": "2026-12-22",
+      "colorKey": "accent",
+      "phases": [
+        {
+          "id": "ph-initial-development",
+          "name": "初期開発",
+          "order": 1,
+          "goal": "バーチャルオフィス機能を初回公開できる状態にする。",
+          "description": "初回公開までの設計・実装・検証。",
+          "startDate": "2026-09-07",
+          "endDate": "2026-11-27",
+          "colorKey": "accent",
+          "stages": [
+            {
+              "id": "st-design",
+              "name": "設計",
+              "order": 1,
+              "goal": "実装に着手できる粒度まで仕様と画面と技術方式を確定する。",
+              "startDate": "2026-09-07",
+              "endDate": "2026-09-25",
+              "colorKey": "accent",
+              "milestones": [
+                {
+                  "id": "ms-requirements-fixed",
+                  "name": "要件確定",
+                  "order": 1,
+                  "date": "2026-09-18",
+                  "ownerRole": "プロダクト管理",
+                  "description": "機能仕様と対象範囲を確定し、以降の変更を管理下に置く。",
+                  "deliverables": [
+                    "機能仕様書",
+                    "対象範囲の一覧"
+                  ],
+                  "exitCriteria": [
+                    "追加する画面と機能が一覧化されている",
+                    "既存機能への影響範囲が特定されている"
+                  ],
+                  "tasks": [
+                    {
+                      "id": "tk-requirements-survey",
+                      "name": "既存機能の調査",
+                      "order": 1,
+                      "status": "done",
+                      "startDate": "2026-09-07",
+                      "endDate": "2026-09-11",
+                      "durationDays": 5,
+                      "effortDays": 4,
+                      "assigneeRole": "プロダクト管理",
+                      "progress": 100,
+                      "isCriticalPath": true,
+                      "parallelizable": false,
+                      "notes": "影響を受ける既存画面とデータの洗い出し。"
+                    },
+                    {
+                      "id": "tk-requirements-definition",
+                      "name": "機能仕様の確定",
+                      "order": 2,
+                      "status": "done",
+                      "startDate": "2026-09-14",
+                      "endDate": "2026-09-18",
+                      "durationDays": 5,
+                      "effortDays": 4,
+                      "assigneeRole": "プロダクト管理",
+                      "progress": 100,
+                      "dependsOn": [
+                        {
+                          "taskId": "tk-requirements-survey",
+                          "type": "FS",
+                          "lagDays": 0
+                        }
+                      ],
+                      "isCriticalPath": true,
+                      "parallelizable": false
+                    }
+                  ]
+                },
+                {
+                  "id": "ms-design-fixed",
+                  "name": "設計確定",
+                  "order": 2,
+                  "date": "2026-09-25",
+                  "ownerRole": "デザイン",
+                  "description": "画面と技術方式を確定し、実装の着手条件を満たす。",
+                  "deliverables": [
+                    "画面設計一式",
+                    "データモデル図",
+                    "通信方式の選定結果"
+                  ],
+                  "exitCriteria": [
+                    "主要画面の設計が確定している",
+                    "データモデルが確定している",
+                    "リアルタイム通信の方式が選定されている"
+                  ],
+                  "dependsOn": [
+                    "ms-requirements-fixed"
+                  ],
+                  "tasks": [
+                    {
+                      "id": "tk-ui-design",
+                      "name": "画面設計",
+                      "order": 1,
+                      "status": "done",
+                      "startDate": "2026-09-16",
+                      "endDate": "2026-09-25",
+                      "durationDays": 6,
+                      "effortDays": 3,
+                      "assigneeRole": "デザイン",
+                      "progress": 100,
+                      "dependsOn": [
+                        {
+                          "taskId": "tk-requirements-definition",
+                          "type": "SS",
+                          "lagDays": 2
+                        }
+                      ],
+                      "parallelizable": true,
+                      "notes": "機能仕様の確定と並行して着手する。"
+                    },
+                    {
+                      "id": "tk-tech-design",
+                      "name": "技術設計",
+                      "order": 2,
+                      "status": "done",
+                      "startDate": "2026-09-16",
+                      "endDate": "2026-09-25",
+                      "durationDays": 6,
+                      "effortDays": 5,
+                      "assigneeRole": "バックエンド実装",
+                      "progress": 100,
+                      "dependsOn": [
+                        {
+                          "taskId": "tk-requirements-definition",
+                          "type": "SS",
+                          "lagDays": 2
+                        }
+                      ],
+                      "isCriticalPath": true,
+                      "parallelizable": true,
+                      "notes": "リアルタイム通信は新規の技術要素のため倍率 1.3 を適用した。"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "st-implementation",
+              "name": "実装",
+              "order": 2,
+              "goal": "追加機能が一通り動作する状態にする。",
+              "startDate": "2026-09-28",
+              "endDate": "2026-11-06",
+              "colorKey": "cool",
+              "milestones": [
+                {
+                  "id": "ms-backend-ready",
+                  "name": "サーバ側疎通完了",
+                  "order": 1,
+                  "date": "2026-10-23",
+                  "ownerRole": "バックエンド実装",
+                  "description": "サーバ側の機能が単体で動作し、画面側から呼び出せる状態になる。",
+                  "deliverables": [
+                    "データモデル実装",
+                    "リアルタイム通信の疎通確認結果"
+                  ],
+                  "exitCriteria": [
+                    "データモデルが本番相当の環境に反映されている",
+                    "リアルタイム通信が2端末間で確認できている"
+                  ],
+                  "dependsOn": [
+                    "ms-design-fixed"
+                  ],
+                  "tasks": [
+                    {
+                      "id": "tk-infra-setup",
+                      "name": "実行環境の整備",
+                      "order": 1,
+                      "status": "done",
+                      "startDate": "2026-09-28",
+                      "endDate": "2026-10-02",
+                      "durationDays": 5,
+                      "effortDays": 4,
+                      "assigneeRole": "バックエンド実装",
+                      "progress": 100,
+                      "dependsOn": [
+                        {
+                          "taskId": "tk-tech-design",
+                          "type": "FS",
+                          "lagDays": 0
+                        }
+                      ],
+                      "parallelizable": true
+                    },
+                    {
+                      "id": "tk-backend-datamodel",
+                      "name": "データモデル実装",
+                      "order": 2,
+                      "status": "done",
+                      "startDate": "2026-10-05",
+                      "endDate": "2026-10-15",
+                      "durationDays": 8,
+                      "effortDays": 6,
+                      "assigneeRole": "バックエンド実装",
+                      "progress": 100,
+                      "dependsOn": [
+                        {
+                          "taskId": "tk-infra-setup",
+                          "type": "FS",
+                          "lagDays": 0
+                        }
+                      ],
+                      "isCriticalPath": true,
+                      "parallelizable": false,
+                      "notes": "サーバ側の担当は1名のため、実行環境の整備の後に直列で置いた。"
+                    },
+                    {
+                      "id": "tk-backend-realtime",
+                      "name": "リアルタイム通信実装",
+                      "order": 3,
+                      "status": "inprogress",
+                      "startDate": "2026-10-16",
+                      "endDate": "2026-10-23",
+                      "durationDays": 6,
+                      "effortDays": 5,
+                      "assigneeRole": "バックエンド実装",
+                      "progress": 50,
+                      "dependsOn": [
+                        {
+                          "taskId": "tk-backend-datamodel",
+                          "type": "FS",
+                          "lagDays": 0
+                        }
+                      ],
+                      "isCriticalPath": true,
+                      "parallelizable": false,
+                      "notes": "新規の技術要素のため倍率 1.3 を適用した。"
+                    }
+                  ]
+                },
+                {
+                  "id": "ms-feature-complete",
+                  "name": "機能実装完了",
+                  "order": 2,
+                  "date": "2026-11-06",
+                  "ownerRole": "フロントエンド実装",
+                  "description": "画面とサーバがつながり、想定した操作が一通り通る状態になる。",
+                  "deliverables": [
+                    "バーチャルオフィス画面一式",
+                    "結合済みの動作環境"
+                  ],
+                  "exitCriteria": [
+                    "追加した全画面が操作できる",
+                    "サーバ側との結合が完了している",
+                    "既知の不具合が一覧化されている"
+                  ],
+                  "dependsOn": [
+                    "ms-backend-ready"
+                  ],
+                  "tasks": [
+                    {
+                      "id": "tk-frontend-office",
+                      "name": "バーチャルオフィス画面実装",
+                      "order": 1,
+                      "status": "inprogress",
+                      "startDate": "2026-10-05",
+                      "endDate": "2026-10-23",
+                      "durationDays": 14,
+                      "effortDays": 11,
+                      "assigneeRole": "フロントエンド実装",
+                      "progress": 50,
+                      "dependsOn": [
+                        {
+                          "taskId": "tk-ui-design",
+                          "type": "FS",
+                          "lagDays": 5
+                        }
+                      ],
+                      "parallelizable": true,
+                      "notes": "サーバ側実装と並行して進める。"
+                    },
+                    {
+                      "id": "tk-integration",
+                      "name": "画面とサーバの結合",
+                      "order": 2,
+                      "status": "notstarted",
+                      "startDate": "2026-10-26",
+                      "endDate": "2026-11-02",
+                      "durationDays": 6,
+                      "effortDays": 7,
+                      "assigneeRole": "フロントエンド実装",
+                      "progress": 0,
+                      "dependsOn": [
+                        {
+                          "taskId": "tk-frontend-office",
+                          "type": "FS",
+                          "lagDays": 0
+                        },
+                        {
+                          "taskId": "tk-backend-realtime",
+                          "type": "FS",
+                          "lagDays": 0
+                        }
+                      ],
+                      "isCriticalPath": true,
+                      "parallelizable": false
+                    },
+                    {
+                      "id": "tk-buffer-implementation",
+                      "name": "実装バッファ",
+                      "order": 3,
+                      "status": "notstarted",
+                      "startDate": "2026-11-04",
+                      "endDate": "2026-11-06",
+                      "durationDays": 3,
+                      "effortDays": 0,
+                      "progress": 0,
+                      "dependsOn": [
+                        {
+                          "taskId": "tk-integration",
+                          "type": "FS",
+                          "lagDays": 0
+                        }
+                      ],
+                      "isBuffer": true,
+                      "isCriticalPath": true,
+                      "parallelizable": false,
+                      "notes": "実装工程の経過稼働日数の10%相当。"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "st-verification",
+              "name": "検証と公開",
+              "order": 3,
+              "goal": "品質を確認したうえで本番に反映する。",
+              "startDate": "2026-11-09",
+              "endDate": "2026-11-27",
+              "colorKey": "warm",
+              "milestones": [
+                {
+                  "id": "ms-uat-complete",
+                  "name": "受け入れテスト完了",
+                  "order": 1,
+                  "date": "2026-11-20",
+                  "ownerRole": "検証",
+                  "description": "想定した利用シナリオが通り、公開可否の判断ができる状態になる。",
+                  "deliverables": [
+                    "テスト結果一覧",
+                    "残課題一覧"
+                  ],
+                  "exitCriteria": [
+                    "全テスト項目を実施済み",
+                    "重大な不具合が残っていない"
+                  ],
+                  "dependsOn": [
+                    "ms-feature-complete"
+                  ],
+                  "tasks": [
+                    {
+                      "id": "tk-integration-test",
+                      "name": "結合テスト",
+                      "order": 1,
+                      "status": "notstarted",
+                      "startDate": "2026-11-09",
+                      "endDate": "2026-11-13",
+                      "durationDays": 5,
+                      "effortDays": 5,
+                      "assigneeRole": "検証",
+                      "progress": 0,
+                      "dependsOn": [
+                        {
+                          "taskId": "tk-buffer-implementation",
+                          "type": "FS",
+                          "lagDays": 0
+                        }
+                      ],
+                      "isCriticalPath": true,
+                      "parallelizable": false
+                    },
+                    {
+                      "id": "tk-uat",
+                      "name": "受け入れテスト",
+                      "order": 2,
+                      "status": "notstarted",
+                      "startDate": "2026-11-16",
+                      "endDate": "2026-11-20",
+                      "durationDays": 5,
+                      "effortDays": 5,
+                      "assigneeRole": "検証",
+                      "progress": 0,
+                      "dependsOn": [
+                        {
+                          "taskId": "tk-integration-test",
+                          "type": "FS",
+                          "lagDays": 0
+                        }
+                      ],
+                      "isCriticalPath": true,
+                      "parallelizable": false
+                    },
+                    {
+                      "id": "tk-fix-findings",
+                      "name": "指摘対応",
+                      "order": 3,
+                      "status": "notstarted",
+                      "startDate": "2026-11-18",
+                      "endDate": "2026-11-20",
+                      "durationDays": 3,
+                      "effortDays": 2,
+                      "assigneeRole": "フロントエンド実装",
+                      "progress": 0,
+                      "dependsOn": [
+                        {
+                          "taskId": "tk-uat",
+                          "type": "SS",
+                          "lagDays": 2
+                        }
+                      ],
+                      "parallelizable": true,
+                      "notes": "受け入れテストの開始から2稼働日遅らせて並走させる。"
+                    }
+                  ]
+                },
+                {
+                  "id": "ms-release",
+                  "name": "本番公開",
+                  "order": 2,
+                  "date": "2026-11-27",
+                  "ownerRole": "バックエンド実装",
+                  "description": "本番環境に反映し、利用者が使える状態になる。",
+                  "deliverables": [
+                    "本番反映済みの機能",
+                    "切り戻し手順書"
+                  ],
+                  "exitCriteria": [
+                    "本番環境で主要な操作が確認できている",
+                    "切り戻し手順が用意されている"
+                  ],
+                  "dependsOn": [
+                    "ms-uat-complete"
+                  ],
+                  "tasks": [
+                    {
+                      "id": "tk-release-prep",
+                      "name": "公開準備",
+                      "order": 1,
+                      "status": "notstarted",
+                      "startDate": "2026-11-24",
+                      "endDate": "2026-11-25",
+                      "durationDays": 2,
+                      "effortDays": 2,
+                      "assigneeRole": "バックエンド実装",
+                      "progress": 0,
+                      "dependsOn": [
+                        {
+                          "taskId": "tk-uat",
+                          "type": "FS",
+                          "lagDays": 0
+                        }
+                      ],
+                      "isCriticalPath": true,
+                      "parallelizable": false
+                    },
+                    {
+                      "id": "tk-buffer-release",
+                      "name": "公開バッファ",
+                      "order": 2,
+                      "status": "notstarted",
+                      "startDate": "2026-11-26",
+                      "endDate": "2026-11-26",
+                      "durationDays": 1,
+                      "effortDays": 0,
+                      "progress": 0,
+                      "dependsOn": [
+                        {
+                          "taskId": "tk-release-prep",
+                          "type": "FS",
+                          "lagDays": 0
+                        }
+                      ],
+                      "isBuffer": true,
+                      "isCriticalPath": true,
+                      "parallelizable": false
+                    },
+                    {
+                      "id": "tk-release",
+                      "name": "本番反映と稼働確認",
+                      "order": 3,
+                      "status": "notstarted",
+                      "startDate": "2026-11-27",
+                      "endDate": "2026-11-27",
+                      "durationDays": 1,
+                      "effortDays": 1,
+                      "assigneeRole": "バックエンド実装",
+                      "progress": 0,
+                      "dependsOn": [
+                        {
+                          "taskId": "tk-buffer-release",
+                          "type": "FS",
+                          "lagDays": 0
+                        }
+                      ],
+                      "isCriticalPath": true,
+                      "parallelizable": false
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ph-feature-expansion",
+          "name": "機能拡張",
+          "order": 2,
+          "goal": "公開後に必要となる3機能を、機能ごとに順次使える状態にする。",
+          "description": "初回公開に含めなかった機能を、機能単位で区切って追加する取り組み。工程を挟まず、機能ごとのマイルストンを並べている。",
+          "startDate": "2026-11-30",
+          "endDate": "2026-12-22",
+          "colorKey": "purple",
+          "milestones": [
+            {
+              "id": "ms-feature-a",
+              "name": "機能A 完成",
+              "order": 1,
+              "date": "2026-12-11",
+              "ownerRole": "プロダクト管理",
+              "description": "在席状況の共有機能が、画面側とサーバ側の双方で動作する状態になる。",
+              "deliverables": [
+                "在席状況の共有機能",
+                "動作テスト結果"
+              ],
+              "exitCriteria": [
+                "在席状況が他の利用者から見えている",
+                "動作テストの項目をすべて実施済み"
+              ],
+              "dependsOn": [
+                "ms-release"
+              ],
+              "tasks": [
+                {
+                  "id": "tk-fa-requirements",
+                  "name": "機能A 要件定義",
+                  "order": 1,
+                  "status": "notstarted",
+                  "startDate": "2026-11-30",
+                  "endDate": "2026-12-02",
+                  "durationDays": 3,
+                  "effortDays": 2,
+                  "assigneeRole": "プロダクト管理",
+                  "progress": 0,
+                  "dependsOn": [
+                    {
+                      "taskId": "tk-release",
+                      "type": "FS",
+                      "lagDays": 0
+                    }
+                  ],
+                  "isCriticalPath": true,
+                  "parallelizable": false
+                },
+                {
+                  "id": "tk-fa-backend",
+                  "name": "機能A サーバ側実装",
+                  "order": 2,
+                  "status": "notstarted",
+                  "startDate": "2026-12-03",
+                  "endDate": "2026-12-09",
+                  "durationDays": 5,
+                  "effortDays": 4,
+                  "assigneeRole": "バックエンド実装",
+                  "progress": 0,
+                  "dependsOn": [
+                    {
+                      "taskId": "tk-fa-requirements",
+                      "type": "FS",
+                      "lagDays": 0
+                    }
+                  ],
+                  "isCriticalPath": true,
+                  "parallelizable": true
+                },
+                {
+                  "id": "tk-fa-frontend",
+                  "name": "機能A 画面側実装",
+                  "order": 3,
+                  "status": "notstarted",
+                  "startDate": "2026-12-03",
+                  "endDate": "2026-12-09",
+                  "durationDays": 5,
+                  "effortDays": 4,
+                  "assigneeRole": "フロントエンド実装",
+                  "progress": 0,
+                  "dependsOn": [
+                    {
+                      "taskId": "tk-fa-requirements",
+                      "type": "FS",
+                      "lagDays": 0
+                    }
+                  ],
+                  "parallelizable": true,
+                  "notes": "サーバ側実装と担当が異なるため並行して進める。"
+                },
+                {
+                  "id": "tk-fa-test",
+                  "name": "機能A 動作テスト",
+                  "order": 4,
+                  "status": "notstarted",
+                  "startDate": "2026-12-10",
+                  "endDate": "2026-12-11",
+                  "durationDays": 2,
+                  "effortDays": 2,
+                  "assigneeRole": "検証",
+                  "progress": 0,
+                  "dependsOn": [
+                    {
+                      "taskId": "tk-fa-backend",
+                      "type": "FS",
+                      "lagDays": 0
+                    },
+                    {
+                      "taskId": "tk-fa-frontend",
+                      "type": "FS",
+                      "lagDays": 0
+                    }
+                  ],
+                  "parallelizable": false
+                }
+              ]
+            },
+            {
+              "id": "ms-feature-b",
+              "name": "機能B 完成",
+              "order": 2,
+              "date": "2026-12-17",
+              "ownerRole": "バックエンド実装",
+              "description": "利用状況の集計機能が動作し、既存の管理画面から確認できる状態になる。",
+              "deliverables": [
+                "利用状況の集計処理",
+                "動作テスト結果"
+              ],
+              "exitCriteria": [
+                "集計結果が管理画面に表示されている",
+                "動作テストの項目をすべて実施済み"
+              ],
+              "dependsOn": [
+                "ms-feature-a"
+              ],
+              "tasks": [
+                {
+                  "id": "tk-fb-requirements",
+                  "name": "機能B 要件定義",
+                  "order": 1,
+                  "status": "notstarted",
+                  "startDate": "2026-12-03",
+                  "endDate": "2026-12-04",
+                  "durationDays": 2,
+                  "effortDays": 1,
+                  "assigneeRole": "プロダクト管理",
+                  "progress": 0,
+                  "dependsOn": [
+                    {
+                      "taskId": "tk-fa-requirements",
+                      "type": "FS",
+                      "lagDays": 0
+                    }
+                  ],
+                  "parallelizable": true
+                },
+                {
+                  "id": "tk-fb-backend",
+                  "name": "機能B サーバ側実装",
+                  "order": 2,
+                  "status": "notstarted",
+                  "startDate": "2026-12-10",
+                  "endDate": "2026-12-15",
+                  "durationDays": 4,
+                  "effortDays": 3,
+                  "assigneeRole": "バックエンド実装",
+                  "progress": 0,
+                  "dependsOn": [
+                    {
+                      "taskId": "tk-fb-requirements",
+                      "type": "FS",
+                      "lagDays": 0
+                    },
+                    {
+                      "taskId": "tk-fa-backend",
+                      "type": "FS",
+                      "lagDays": 0
+                    }
+                  ],
+                  "isCriticalPath": true,
+                  "parallelizable": false,
+                  "notes": "サーバ側の担当は1名のため、機能Aのサーバ側実装の後に直列で置いた。"
+                },
+                {
+                  "id": "tk-fb-test",
+                  "name": "機能B 動作テスト",
+                  "order": 3,
+                  "status": "notstarted",
+                  "startDate": "2026-12-16",
+                  "endDate": "2026-12-17",
+                  "durationDays": 2,
+                  "effortDays": 2,
+                  "assigneeRole": "検証",
+                  "progress": 0,
+                  "dependsOn": [
+                    {
+                      "taskId": "tk-fb-backend",
+                      "type": "FS",
+                      "lagDays": 0
+                    }
+                  ],
+                  "isCriticalPath": true,
+                  "parallelizable": false
+                }
+              ]
+            },
+            {
+              "id": "ms-feature-c",
+              "name": "機能C 完成",
+              "order": 3,
+              "date": "2026-12-22",
+              "ownerRole": "フロントエンド実装",
+              "description": "通知設定の画面が追加され、利用者が自分で切り替えられる状態になる。",
+              "deliverables": [
+                "通知設定画面",
+                "動作テスト結果"
+              ],
+              "exitCriteria": [
+                "利用者が通知の有無を切り替えられる",
+                "動作テストの項目をすべて実施済み"
+              ],
+              "dependsOn": [
+                "ms-feature-b"
+              ],
+              "tasks": [
+                {
+                  "id": "tk-fc-requirements",
+                  "name": "機能C 要件定義",
+                  "order": 1,
+                  "status": "notstarted",
+                  "startDate": "2026-12-07",
+                  "endDate": "2026-12-08",
+                  "durationDays": 2,
+                  "effortDays": 1,
+                  "assigneeRole": "プロダクト管理",
+                  "progress": 0,
+                  "dependsOn": [
+                    {
+                      "taskId": "tk-fb-requirements",
+                      "type": "FS",
+                      "lagDays": 0
+                    }
+                  ],
+                  "parallelizable": true
+                },
+                {
+                  "id": "tk-fc-frontend",
+                  "name": "機能C 画面側実装",
+                  "order": 2,
+                  "status": "notstarted",
+                  "startDate": "2026-12-10",
+                  "endDate": "2026-12-16",
+                  "durationDays": 5,
+                  "effortDays": 4,
+                  "assigneeRole": "フロントエンド実装",
+                  "progress": 0,
+                  "dependsOn": [
+                    {
+                      "taskId": "tk-fc-requirements",
+                      "type": "FS",
+                      "lagDays": 0
+                    },
+                    {
+                      "taskId": "tk-fa-frontend",
+                      "type": "FS",
+                      "lagDays": 0
+                    }
+                  ],
+                  "parallelizable": false,
+                  "notes": "画面側の担当は1名のため、機能Aの画面側実装の後に直列で置いた。"
+                },
+                {
+                  "id": "tk-fc-test",
+                  "name": "機能C 動作テスト",
+                  "order": 3,
+                  "status": "notstarted",
+                  "startDate": "2026-12-18",
+                  "endDate": "2026-12-22",
+                  "durationDays": 3,
+                  "effortDays": 3,
+                  "assigneeRole": "検証",
+                  "progress": 0,
+                  "dependsOn": [
+                    {
+                      "taskId": "tk-fc-frontend",
+                      "type": "FS",
+                      "lagDays": 0
+                    },
+                    {
+                      "taskId": "tk-fb-test",
+                      "type": "FS",
+                      "lagDays": 0
+                    }
+                  ],
+                  "isCriticalPath": true,
+                  "parallelizable": false,
+                  "notes": "検証の担当は1名のため、機能Bの動作テストの後に直列で置いた。"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "risks": [
+    {
+      "id": "risk-realtime-unknown",
+      "description": "リアルタイム通信基盤が新規の技術要素であり、検証に想定以上の時間がかかる可能性がある。",
+      "impact": "high",
+      "likelihood": "medium",
+      "mitigation": "技術設計の段階で最小構成の疎通確認を先に行い、方式が成立しないと分かった時点で代替方式に切り替える。",
+      "relatedIds": [
+        "tk-tech-design",
+        "tk-backend-realtime"
+      ]
+    },
+    {
+      "id": "risk-fixed-deadline",
+      "description": "公開日が固定のため、実装が遅れた場合に吸収できるバッファが実装工程の3稼働日と公開直前の1稼働日しかない。",
+      "impact": "high",
+      "likelihood": "medium",
+      "mitigation": "バッファを使い切る見込みが立った時点で、機能範囲の削減候補を提示して判断を仰ぐ。",
+      "relatedIds": [
+        "tk-buffer-implementation",
+        "tk-buffer-release"
+      ]
+    },
+    {
+      "id": "risk-parallel-frontend",
+      "description": "画面側実装をサーバ側実装と並行させているため、設計変更が発生すると両方に手戻りが出る。",
+      "impact": "medium",
+      "likelihood": "low",
+      "mitigation": "画面設計の確定分から順に着手し、未確定部分には手を付けない。",
+      "relatedIds": [
+        "tk-frontend-office"
+      ]
+    }
+  ],
+  "changeLog": [
+    {
+      "revision": 1,
+      "date": "2026-09-05",
+      "instruction": "社内ポータルにバーチャルオフィス機能を追加する。リリースは11月中目標のため逆算してスケジュールを作って",
+      "summary": "初版作成。プロジェクト1件・フェーズ2件・工程3件・マイルストン9件・タスク26件で構成した。公開日 2026-11-27 からの逆算で初期開発の日程を配置し、その後の機能拡張を前向きに積んだ。初期開発は工程を挟む形、機能拡張は工程を挟まない形で構成した。",
+      "changes": []
+    }
+  ]
+}
