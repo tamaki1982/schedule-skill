@@ -1213,6 +1213,8 @@
     font-size: 12.5px; color: var(--text-primary); cursor: pointer;
   }
   .field .check-line input { width: auto; margin: 0; }
+  /* 1項目に統合した入力欄どうしの境目。ラベルは増やさず、線と余白だけで示す。 */
+  .field-subdivider { margin: 8px 0; border-top: 0.5px solid var(--border); }
   .field-note { font-size: 11px; color: var(--text-muted); margin-top: 3px; line-height: 1.6; }
   .field-note.warn { color: var(--edit-accent); }
   .drawer-section {
@@ -1527,7 +1529,7 @@
     <!-- 設定。スケジュール 1 本ではなく、スケジュールをまたいで効くもの。
          いまの中身は「日程の決まり」1 項目だけ（休みの日に日程を置けるようにする）。
          状態の切り替え・見た目（休日の色付け・バーの色）・定義ファイルの閲覧編集は
-         taka 指示（2026/09/07）で配布版から外してある。データとしては残り、
+         運用判断（2026/09/07）で配布版から外してある。データとしては残り、
          生成時の値どおりに描かれる（読む側は dayOffClasses / applyBarColor / statusOf、
          直す口だけが無い）。
          タブは無い。区分が 1 つだけなので区切る意味が無い（判断79 は区分が
@@ -1587,6 +1589,7 @@
   <div class="modal-head" id="exportConfirmTitle">新しいファイルに書き出す</div>
   <div class="modal-body">
     <p>いま画面で直した内容を、2 つのファイルとして書き出します。開いているこのページは元のまま変わりません。</p>
+    <p>ブラウザの保存先（通常はダウンロードフォルダ）に出力されます。</p>
     <div class="modal-filenames">
       <code id="exportConfirmHtmlName"></code>
       <code id="exportConfirmJsonName"></code>
@@ -1609,6 +1612,21 @@
   <div class="modal-actions">
     <button type="button" class="plain-btn" id="importConfirmCancel">やめる</button>
     <button type="button" id="importConfirmOk">ファイルを選ぶ</button>
+  </div>
+</div>
+
+<div class="modal" id="groupNameModal" role="dialog" aria-modal="true"
+     aria-labelledby="groupNameTitle" hidden>
+  <div class="modal-head" id="groupNameTitle">まとめて呼ぶ名前を付ける</div>
+  <div class="modal-body">
+    <p>プロジェクトが複数になりました。まとめて呼ぶ名前を付けると、この画面のタブと印刷の表題に使われます。</p>
+    <div class="field">
+      <input type="text" id="groupNameInput" placeholder="例: ○○プロジェクト群" maxlength="80">
+    </div>
+  </div>
+  <div class="modal-actions">
+    <button type="button" class="plain-btn" id="groupNameCancel">あとで決める</button>
+    <button type="button" id="groupNameOk">この名前にする</button>
   </div>
 </div>
 
@@ -1699,7 +1717,7 @@ var SCHEDULE_DOCUMENT = {
     "display": {
       "defaultZoom": "week",
       "defaultPhaseId": "ph-initial-development",
-      "defaultExpandLevel": "auto"
+      "defaultExpandLevel": "task"
     },
     "resources": {
       "roles": [
@@ -2710,6 +2728,15 @@ function eachPhase(doc, fn) {
     (pr.phases || []).forEach(function (ph) { fn(ph, pr); });
   });
 }
+/* 追加した節点とその配下をまとめて開いた扱いにする。
+   新しく足した工程・マイルストン・フェーズ・プロジェクトは、その直下の 1 段だけを
+   開いても、さらに下（例: 工程を足すと一緒に生まれるマイルストンとタスク）が
+   閉じたままだと気づかれない。追加操作のどれでも同じにするため、ここ 1 か所にまとめる。 */
+function expandSubtree(node, kind) {
+  eachIn(node, kind, function (n, k) {
+    if (k !== 'task') STATE.expanded[n.id] = true;
+  });
+}
 
 /* ==================================================================
    表題
@@ -2719,9 +2746,12 @@ function eachPhase(doc, fn) {
      プロジェクトが 2 件以上 … <meta.groupName> スケジュール
    区切りは半角空白 1 つ、末尾は「スケジュール」で固定。
 
-   画面は meta を書き換えない（display を書き換えないのと同じ原則）。
-   名前を変えても表題は自動で追随させず、
-   あるべき表題を警告に出して、設定ファイルビューで直してもらう。
+   画面は基本的に meta を書き換えない（display を書き換えないのと同じ原則）。
+   プロジェクト名を変えても表題は自動で追随させず、あるべき表題を警告に出すだけに留める。
+   例外は束の名前（meta.groupName）で、プロジェクトを追加して 2 件以上になった直後に
+   専用のモーダルでその場で入力してもらい、確定した名前を meta.groupName / meta.title に
+   直接書く（openGroupNameModal / applyGroupName）。この警告はその入力を後回しにした場合と、
+   読み込み・貼り付けなど画面外の経路で束の名前が欠けたまま入ってきた場合の保険。
    ================================================================== */
 var TITLE_SUFFIX = ' スケジュール';
 function expectedTitle(doc) {
@@ -2742,12 +2772,12 @@ function titleWarnings(doc) {
   var have = doc.meta ? doc.meta.title : undefined;
 
   if (ps.length >= 2 && !g) {
-    out.push('プロジェクトが ' + ps.length + ' 件あるので、束の名前 meta.groupName が要る。' +
-      '設定ファイルビューで meta に groupName を足すと、表題は「<その名前>' + TITLE_SUFFIX + '」になる');
+    out.push('プロジェクトが ' + ps.length + ' 件になったが、まとめて呼ぶ名前がまだ無い。' +
+      '名前を付けると、表題が「<その名前>' + TITLE_SUFFIX + '」になる');
   }
   if (ps.length === 1 && g !== undefined) {
-    out.push('プロジェクトが 1 件のときは meta.groupName を書かない。' +
-      '表題はプロジェクト名から組み立てるため、別の名前を置くと食い違いの元になる');
+    out.push('プロジェクトが 1 件のときは、まとめて呼ぶ名前を付けない。' +
+      '表題はプロジェクト名から組み立てるため、名前が残っていると食い違いの元になる');
   }
   if (want && have !== want) {
     out.push('表題が階層と合っていない。meta.title は「' + want + '」であるべき（いまは「' +
@@ -4673,7 +4703,7 @@ var PATH_FIELD_LABEL = {
   projects: 'プロジェクト',
   phases: 'フェーズ', stages: '工程', milestones: 'マイルストン', tasks: 'タスク',
   taskTypes: 'タスク種別',
-  id: '識別子', name: '名前', label: '表示名', type: '種別', status: '状態',
+  id: '識別子', name: '名前', label: '表示名', type: '種別', status: 'ステータス',
   date: '期日', startDate: '開始日', endDate: '終了日', dependsOn: '依存関係',
   title: 'タイトル', schemaVersion: 'スキーマの版', revision: '版番号',
   generatedAt: '生成日時', timelineStart: '表示の開始日', timelineEnd: '表示の終了日',
@@ -4955,7 +4985,7 @@ function renderBanner() {
   document.getElementById('ebText').textContent =
     !dirty ? '書き出すまでファイルには残りません'
       : wrote ? '書き出し済み'
-        : '編集結果を残すには書き出しが必要です';
+        : 'このHTMLは静的なファイルです。HTML上で編集した結果を残すには書き出しが必要です';
 }
 
 /* ==================================================================
@@ -5306,7 +5336,7 @@ function addChild(parentId) {
   renumber(STATE.doc);
   D = derive(STATE.doc);
   STATE.expanded[parentId] = true;
-  if (ck !== 'task') STATE.expanded[node.id] = true;
+  if (ck !== 'task') expandSubtree(node, ck);
   STATE.selectedId = node.id;
   STATE.focusId = node.id;
   render();
@@ -5350,8 +5380,7 @@ function addPhase() {
      切り替えないと追加したものが画面に出ない。 */
   STATE.phaseId = ph.id;
   D = derive(STATE.doc);
-  STATE.expanded[ph.id] = true;
-  STATE.expanded[ph.milestones[0].id] = true;
+  expandSubtree(ph, 'phase');
   STATE.selectedId = ph.id;
   STATE.focusId = ph.id;
   render();
@@ -5370,14 +5399,18 @@ function addProject() {
   STATE.projectId = pr.id;
   STATE.phaseId = pr.phases[0].id;
   D = derive(STATE.doc);
-  STATE.expanded[pr.id] = true;
-  STATE.expanded[pr.phases[0].id] = true;
-  STATE.expanded[pr.phases[0].milestones[0].id] = true;
+  expandSubtree(pr, 'project');
   STATE.selectedId = pr.id;
   STATE.focusId = null;
   render();
   openDrawer(true);
   toast('プロジェクトを追加した。フェーズ 1 本から始まる');
+  /* 2 件目以降になった瞬間が、束の名前を決める一番自然なタイミング。
+     警告に出して設定ファイルビューへ誘導するより、その場で聞くほうが早い
+     （すでに名前が付いている場合は聞き直さない）。 */
+  if (STATE.doc.projects.length >= 2 && !(STATE.doc.meta && STATE.doc.meta.groupName)) {
+    openGroupNameModal();
+  }
 }
 
 /* ---- フェーズ直下の形の切り替え ---- */
@@ -6110,12 +6143,15 @@ function renderDrawer() {
   b.appendChild(field('名前', textInput(node, 'name')));
 
   if (kind === 'task') {
-    /* 状態は読むだけ（切り替え UI は置かない）。変えるには生成時の指示か、
-       設定ファイルビューでの直接編集による。データに未知の値が入っていた場合も
-       未着手として表示する（statusOf）。取り消し線・バーの塗り・上位への波及は
-       これまで通りこの値から算出する（isDone / D.calc）。 */
-    b.appendChild(field('状態', readOnlyValue(STATUS_LABEL[statusOf(node)])));
-    b.appendChild(field('担当（役割）', selectInput(node, 'assigneeRole', roleOptions())));
+    /* ステータスは詳細パネルから切り替えられるようにする（プルダウン）。
+       使うかどうかは利用者しだいで、切り替えなくても値は生成時のまま残る。
+       取り消し線・バーの塗り・上位への波及は、これまで通り statusOf /
+       isDone / D.calc がこの値から算出する。
+       担当（役割）は詳細パネルには出さない。設定しても画面上のどこにも
+       表現されず意味を持たなかったため。assigneeRole は
+       validate_schedule.py の C10（同一役割の重なりチェック）が読むため、
+       データからは削らない。生成側（SKILL.md / definitions）も今まで通り書く。 */
+    b.appendChild(field('ステータス', selectInput(node, 'status', statusOptions())));
     var bufWrap = el('div', 'field');
     var buf = document.createElement('input');
     buf.type = 'checkbox';
@@ -6129,7 +6165,7 @@ function renderDrawer() {
     bufLabel.setAttribute('for', 'fieldIsBuffer');
     bufLabel.className = 'check-line';
     bufLabel.appendChild(buf);
-    bufLabel.appendChild(document.createTextNode('予備日（バーを斜線にする）'));
+    bufLabel.appendChild(document.createTextNode('このタスクは予備日としてプロット'));
     bufWrap.appendChild(bufLabel);
     b.appendChild(bufWrap);
 
@@ -6156,27 +6192,44 @@ function renderDrawer() {
 
     b.appendChild(field('メモ', areaInput(node, 'notes')));
 
-    b.appendChild(el('div', 'drawer-section', '所属'));
     b.appendChild(field('所属マイルストン', parentSelect(id, 'task')));
 
   } else if (kind === 'ms') {
     b.appendChild(field('期日', dateInput(node, 'date')));
-    b.appendChild(field('到達責任（役割）', selectInput(node, 'ownerRole', roleOptions())));
+    /* 到達責任（役割）は詳細パネルには出さない（設定しても画面上に
+       表現されないため）。データ（ownerRole）は削らない。 */
     b.appendChild(field('説明', areaInput(node, 'description')));
 
-    b.appendChild(el('div', 'drawer-section', '到達の中身'));
-    b.appendChild(field('成果物', listInput(node, 'deliverables')));
-    b.appendChild(field('到達条件', listInput(node, 'exitCriteria')));
+    /* 「成果物」と「到達条件」は画面上は「達成条件/成果物」1 項目に統合する。
+       データは deliverables / exitCriteria のまま分けて持つ（スキーマ・
+       validate_schedule.py・SKILL.md / definitions は変更していない。
+       生成側は今まで通り2つのキーに分けて書く）。
+       画面をまたぐ形での統合は影響範囲が広く、統合するのはあくまで
+       画面上の入力欄なのでデータ側は変えない、という判断。
+       個々のラベルは持たせず、プレースホルダだけで中身を示す
+       （2つ並んだテキストエリアがまとめて「達成条件/成果物」1項目に見える形）。
+       見出し「到達の中身」は統合に伴い不要になったため削除した。
+       2つのテキストエリアの間には細い区切り線（.field-subdivider）を挟む。
+       両方とも枠線付きの箱だが、両方に文字が入ると同じ見た目が並ぶだけになり
+       境目が読み取りにくくなるため。ラベルは足さない（1項目にまとめた意味が
+       無くなるため）。線と余白だけで境目を示す。 */
+    var achWrap = el('div', 'field');
+    achWrap.appendChild(el('div', 'field-label', '達成条件/成果物'));
+    achWrap.appendChild(listInput(node, 'exitCriteria', '到達条件を1行に1件'));
+    achWrap.appendChild(el('div', 'field-subdivider'));
+    achWrap.appendChild(listInput(node, 'deliverables', '成果物を1行に1件'));
+    b.appendChild(achWrap);
 
-    b.appendChild(el('div', 'drawer-section', '配下からの集約'));
+    /* 見出し「配下からの集約」は文言だけ削り、区切り線は残す
+       （直後の 期間・タスク数 が急に浮いて見えないようにするため）。 */
+    b.appendChild(el('div', 'drawer-section', ''));
     b.appendChild(field('期間', readOnlyValue(disp(c.s) + ' 〜 ' + disp(c.e))));
     /* 状態の切り替えは置かない（この段の状態は持たず、配下から決まるため）。
        代わりに数え上げだけを出す。取り消し線が引かれた理由がここで読める。 */
-    b.appendChild(field('タスク数', readOnlyValue(
+    b.appendChild(field('このマイルストン内のタスク数', readOnlyValue(
       c.taskCount + ' 件（完了 ' + c.doneCount + ' 件）')));
 
-    b.appendChild(el('div', 'drawer-section', '所属'));
-    b.appendChild(field('所属（工程またはフェーズ）', parentSelect(id, 'ms')));
+    b.appendChild(field('所属している工程/フェーズ', parentSelect(id, 'ms')));
 
   } else {
     b.appendChild(field('目標', areaInput(node, 'goal', 'この' + LEVEL_LABEL[kind] + 'で達成する状態を一文で')));
@@ -6204,7 +6257,11 @@ function renderDrawer() {
     }
 
     b.appendChild(el('div', 'drawer-section', '期間'));
-    b.appendChild(field('配下からの集約', readOnlyValue(disp(c.s) + ' 〜 ' + disp(c.e))));
+    /* 見出し「期間」が直上にあるので、ここはラベルを持たせず値だけ出す
+       （「配下からの集約」というラベル文言だけを削り、値は残す）。 */
+    var periodWrap = el('div', 'field');
+    periodWrap.appendChild(readOnlyValue(disp(c.s) + ' 〜 ' + disp(c.e)));
+    b.appendChild(periodWrap);
     var decl = el('div', 'field-row');
     decl.appendChild(field('宣言した開始日', dateInput(node, 'startDate')));
     decl.appendChild(field('宣言した終了日', dateInput(node, 'endDate')));
@@ -6219,11 +6276,9 @@ function renderDrawer() {
       '（完了 ' + c.doneCount + ' 件）')));
 
     if (kind === 'phase') {
-      b.appendChild(el('div', 'drawer-section', '所属'));
       b.appendChild(field('所属プロジェクト', parentSelect(id, 'phase')));
     }
     if (kind === 'stage') {
-      b.appendChild(el('div', 'drawer-section', '所属'));
       b.appendChild(field('所属フェーズ', parentSelect(id, 'stage'),
         '工程を持つフェーズにだけ移せる。工程を挟まないフェーズは候補に出ない'));
     }
@@ -6504,7 +6559,7 @@ document.addEventListener('visibilitychange', function () {
    details 型のポップオーバー（POPOVERS、下）とは別の仕組み。
    閉じ方は詳細パネルと揃える（背景クリック / Escape）。同時に開くのは 1 枚だけで、
    開いている間はほかのキー操作（Ctrl+Z 等）を拾わない（キー操作は下の keydown 側）。 */
-var MODAL_IDS = ['exportConfirmModal', 'importConfirmModal'];
+var MODAL_IDS = ['exportConfirmModal', 'importConfirmModal', 'groupNameModal'];
 var MODAL_RETURN_FOCUS = null;
 function openModalId() {
   for (var i = 0; i < MODAL_IDS.length; i++) {
@@ -6563,6 +6618,34 @@ document.getElementById('importConfirmCancel').addEventListener('click', closeAl
 document.getElementById('importConfirmOk').addEventListener('click', function () {
   closeAllModals();
   document.getElementById('importInput').click();
+});
+
+/* 束の名前。プロジェクトを追加して 2 件以上になった直後に開く（addProject 参照）。
+   ここで付けた名前をそのまま meta.groupName / meta.title に書く。画面は通常 meta を
+   書き換えないが（表題まわりのコメント参照）、ここは利用者がいま自分で名前を決めて
+   確定させる操作そのものなので、書き換えの対象にする。 */
+function openGroupNameModal() {
+  var input = document.getElementById('groupNameInput');
+  input.value = (STATE.doc.meta && STATE.doc.meta.groupName) || '';
+  openModal('groupNameModal');
+  input.focus();
+}
+function applyGroupName() {
+  var input = document.getElementById('groupNameInput');
+  var name = (input.value || '').trim();
+  if (!name) { input.focus(); return; }
+  pushUndo();
+  STATE.doc.meta.groupName = name;
+  STATE.doc.meta.title = name + TITLE_SUFFIX;
+  D = derive(STATE.doc);
+  closeAllModals();
+  render();
+  toast('束の名前を「' + name + '」にした');
+}
+document.getElementById('groupNameCancel').addEventListener('click', closeAllModals);
+document.getElementById('groupNameOk').addEventListener('click', applyGroupName);
+document.getElementById('groupNameInput').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') { e.preventDefault(); applyGroupName(); }
 });
 
 /* 差し込み型のパネル（いまはキーボード操作の一覧だけ）。

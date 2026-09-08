@@ -133,9 +133,17 @@ def main(argv):
     return 0
 
 
+SUPPORTED_OPTIONS = "--out-root <出力先ルートの絶対パス>"
+
+
 def parse_args(argv):
     """<JSONパス> と、任意の `--out-root <パス>` を読む。
     戻り値は (json_path, out_root_override)。out_root_override は指定が無ければ None。
+
+    知らないオプション（`-` から始まるが --out-root ではないもの）が来た場合は、
+    黙って無視せずここで止める。無視して素通りさせると、例えば --out-root を
+    打ち間違えた場合に「指定が効かず既定の場所へ書き出す」という、気づきにくい形で
+    意図と違う結果になる。
     """
     json_path = None
     out_root_override = None
@@ -148,8 +156,12 @@ def parse_args(argv):
             out_root_override = argv[i + 1]
             i += 2
             continue
-        if not a.startswith("-"):
-            json_path = a
+        if a.startswith("-"):
+            raise BuildError(
+                f"知らないオプションです: {a}\n"
+                f"使えるオプション: {SUPPORTED_OPTIONS}"
+            )
+        json_path = a
         i += 1
     return json_path, out_root_override
 

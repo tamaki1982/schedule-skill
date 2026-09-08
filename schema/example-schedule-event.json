@@ -48,7 +48,7 @@
   },
   "display": {
     "defaultZoom": "week",
-    "defaultExpandLevel": "auto"
+    "defaultExpandLevel": "task"
   },
   "resources": {
     "roles": [

@@ -49,7 +49,7 @@
   "display": {
     "defaultZoom": "week",
     "defaultPhaseId": "ph-initial-development",
-    "defaultExpandLevel": "auto"
+    "defaultExpandLevel": "task"
   },
   "resources": {
     "roles": [
