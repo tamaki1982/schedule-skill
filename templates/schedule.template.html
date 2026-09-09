@@ -851,6 +851,14 @@
   .gantt-left-row.dragging { opacity: 0.4; }
   .gantt-left-row.drop-before { box-shadow: inset 0 2px 0 0 var(--edit-accent); }
   .gantt-left-row.drop-after  { box-shadow: inset 0 -2px 0 0 var(--edit-accent); }
+  /* 「その行の配下（末尾）へ入る」の印。前後の 1 本線（drop-before/after）
+     とは形を変え、行の四辺を枠で囲むことで「中へ入る」と読ませる。
+     枠線は box-shadow では描けないので、この 1 つだけ outline を使う。 */
+  .gantt-left-row.drop-into {
+    outline: 1.5px dashed var(--edit-accent);
+    outline-offset: -1.5px;
+    background: var(--surface-hover);
+  }
   /* 複数選択（範囲ドラッグ／Cmd+A）の印。左端の細い線だけの静かな見せ方にする。
      単体選択（.selected の背景）と重なっても喧嘩しない。 */
   .gantt-left-row.multi-selected, .gantt-right-row.multi-selected {
@@ -3354,6 +3362,77 @@ function declaredWarnText(kindLabel, node, s, e) {
 }
 
 /* ==================================================================
+   validateDoc（書き出し前チェック）が使う、日付まわりの照合ヘルパー
+
+   上の isWork / exceedsDeclared は derive() の中で使う「注意」表示
+   （止めない・STATE.doc に取り込んだあとにしか動かせない）用。
+   validateDoc() は書き出し・取り込みの直前、まだ取り込むかどうか
+   分からない内容に対して独立に動かす必要があるため、同じ規則を
+   ここでもう一度組み立てる。validate_schedule.py（生成側）とも実装は
+   別だが、規則（稼働日の決め方・親の期間のはみ出し方）は合わせてある。
+   ================================================================== */
+function validDateStr(v) { return typeof v === 'string' && DATE_RE.test(v); }
+
+function calendarRules(cal) {
+  cal = cal || {};
+  var workingSet = {};
+  (cal.workingDays || [1, 2, 3, 4, 5]).forEach(function (w) { workingSet[w] = true; });
+  var holidaySet = {};
+  (cal.holidays || []).forEach(function (h) { holidaySet[h] = true; });
+  var exceptionalSet = {};
+  (cal.exceptionalWorkingDays || []).forEach(function (h) { exceptionalSet[h] = true; });
+  function isWorkingDay(isoStr) {
+    if (exceptionalSet[isoStr]) return true;
+    var wd = parseIso(isoStr).getDay();
+    return !!workingSet[wd] && !holidaySet[isoStr];
+  }
+  function countWorking(startIso, endIso) {
+    var n = 0, cur = parseIso(startIso), end = parseIso(endIso);
+    while (cur <= end) { if (isWorkingDay(iso(cur))) n++; cur = addDays(cur, 1); }
+    return n;
+  }
+  return {
+    timelineStart: validDateStr(cal.timelineStart) ? cal.timelineStart : null,
+    timelineEnd: validDateStr(cal.timelineEnd) ? cal.timelineEnd : null,
+    isWorkingDay: isWorkingDay,
+    countWorking: countWorking
+  };
+}
+
+/* 配下の実際の日付範囲（validate_schedule.py の _derive_range と同じ規則）。
+   マイルストンは自分の期日と配下タスクの日付、工程・フェーズは自分の
+   開始日・終了日と、さらに一段下の実際の範囲もあわせて見る。 */
+function deriveActualRange(children, kind) {
+  var starts = [], ends = [];
+  (children || []).forEach(function (c) {
+    if (!c || typeof c !== 'object') return;
+    if (kind === 'milestone') {
+      if (validDateStr(c.date)) { starts.push(c.date); ends.push(c.date); }
+      (c.tasks || []).forEach(function (tk) {
+        if (validDateStr(tk.startDate)) starts.push(tk.startDate);
+        if (validDateStr(tk.endDate)) ends.push(tk.endDate);
+      });
+      return;
+    }
+    if (validDateStr(c.startDate)) starts.push(c.startDate);
+    if (validDateStr(c.endDate)) ends.push(c.endDate);
+    if (kind === 'stage') {
+      var r = deriveActualRange(c.milestones || [], 'milestone');
+      if (r.start) starts.push(r.start);
+      if (r.end) ends.push(r.end);
+    }
+    if (kind === 'phase') {
+      var hasSt = isArray(c.stages) && c.stages.length > 0;
+      var r2 = deriveActualRange(hasSt ? c.stages : (c.milestones || []), hasSt ? 'stage' : 'milestone');
+      if (r2.start) starts.push(r2.start);
+      if (r2.end) ends.push(r2.end);
+    }
+  });
+  starts.sort(); ends.sort();
+  return { start: starts.length ? starts[0] : null, end: ends.length ? ends[ends.length - 1] : null };
+}
+
+/* ==================================================================
    読み込み JSON の形式チェック
    スキーマ全体の検証ではなく、描画に必要な形が揃っているかを見る。
    ================================================================== */
@@ -3387,6 +3466,10 @@ function validateDoc(doc) {
 
   if (!isArray(doc.projects) || !doc.projects.length) { push('projects', '1件以上の配列である必要があります'); return errs; }
 
+  /* 稼働日・日程表の期間の判定は、この先の日付チェックで何度も使う。
+     calendar はここまでで形式チェックを通っているので、そのまま使ってよい。 */
+  var CAL = calendarRules(doc.calendar);
+
   /* dependsOn の参照先チェックに使う、文書全体の id 一覧。
      依存はプロジェクトをまたいで指してよいので、対象は全プロジェクト。 */
   var allIds = {};
@@ -3410,6 +3493,38 @@ function validateDoc(doc) {
     if (DATE_RE.test(tk.startDate) && DATE_RE.test(tk.endDate) && tk.startDate > tk.endDate) {
       push(tp, '開始日が終了日より後になっています（' + disp(tk.startDate) + ' 〜 ' + disp(tk.endDate) + '）');
     }
+    /* 開始日・終了日は、どちらか一方だけを未設定にはできない。
+       両方とも未設定（null）は「日程未定」として通す。 */
+    var sOk = validDateStr(tk.startDate), eOk = validDateStr(tk.endDate);
+    if (sOk !== eOk) {
+      push(tp, '開始日と終了日は、片方だけ未設定にはできません。両方に日付を入れるか、両方とも未設定にしてください');
+    }
+    /* 日程表の期間（calendar.timelineStart 〜 timelineEnd）に収まっているか、
+       稼働日（calendar.workingDays / holidays / exceptionalWorkingDays）に
+       乗っているか。ここを見ないまま書き出すと、書き出した JSON が
+       validate_schedule.py の確認に落ちることがある。 */
+    [['startDate', '開始日'], ['endDate', '終了日']].forEach(function (pair) {
+      var v = tk[pair[0]];
+      if (!validDateStr(v)) return;
+      if (CAL.timelineStart && v < CAL.timelineStart) {
+        push(tp + '.' + pair[0], pair[1] + '（' + disp(v) + '）が、日程表の期間（' + disp(CAL.timelineStart) + ' 以降）より前になっています');
+      }
+      if (CAL.timelineEnd && v > CAL.timelineEnd) {
+        push(tp + '.' + pair[0], pair[1] + '（' + disp(v) + '）が、日程表の期間（' + disp(CAL.timelineEnd) + ' 以前）より後になっています');
+      }
+      if (!CAL.isWorkingDay(v)) {
+        push(tp + '.' + pair[0], pair[1] + '（' + disp(v) + '）が稼働日ではありません。休業日か、稼働する曜日に含まれない日になっています');
+      }
+    });
+    /* 営業日（durationDays）は、開始日〜終了日から実際に数えた稼働日数と
+       違っていると、書き出した JSON が検証に落ちる。 */
+    if (tk.durationDays !== undefined && tk.durationDays !== null &&
+        sOk && eOk && tk.startDate <= tk.endDate) {
+      var actualDays = CAL.countWorking(tk.startDate, tk.endDate);
+      if (tk.durationDays !== actualDays) {
+        push(tp + '.durationDays', '営業日が、開始日〜終了日から数えた実際の稼働日数（' + actualDays + ' 日）と合っていません（いまの値は ' + tk.durationDays + ' 日）');
+      }
+    }
     if (isArray(tk.dependsOn)) {
       tk.dependsOn.forEach(function (dep) {
         var r = refId(dep);
@@ -3429,6 +3544,18 @@ function validateDoc(doc) {
     }
     if (!isArray(ms.tasks) || !ms.tasks.length) { push(mp + '.tasks', '1件以上の配列である必要があります'); return; }
     ms.tasks.forEach(function (tk, ti) { chkTask(tk, mp + '.tasks[' + ti + ']'); });
+    /* マイルストンの期日は、配下タスクが全部終わったあとに置く。
+       期日のほうが早いと、書き出した JSON が検証に落ちる。 */
+    if (validDateStr(ms.date)) {
+      var latestEnd = null;
+      ms.tasks.forEach(function (tk) {
+        if (validDateStr(tk.endDate) && (!latestEnd || tk.endDate > latestEnd)) latestEnd = tk.endDate;
+      });
+      if (latestEnd && ms.date < latestEnd) {
+        push(mp + '.date', '期日（' + disp(ms.date) + '）が、配下タスクの最も遅い終了日（' + disp(latestEnd) +
+          '）より前になっています。マイルストンの期日は、配下タスクが全部終わる日以降にしてください');
+      }
+    }
   }
   function chkStage(st, sp) {
     chkId(st, sp);
@@ -3466,6 +3593,78 @@ function validateDoc(doc) {
       push(rp + '.phases', '1件以上の配列である必要があります'); return;
     }
     pr.phases.forEach(function (ph, pi) { chkPhase(ph, rp + '.phases[' + pi + ']'); });
+  });
+
+  /* ここから下の2つは、1つのノードだけを見ても判定できない
+     （複数の子・複数のタスクをまたいで初めて分かる）ため、
+     上のループとは別に、ドキュメント全体をもう一度たどる。 */
+
+  /* 親（プロジェクト・フェーズ・工程）が自分で書いた開始日・終了日を、
+     配下の実際の日付がはみ出していないか。
+     derive() の exceedsDeclared は画面の「注意」表示用で、はみ出した分は
+     表示を配下に合わせて広げるだけで止めない。ここは書き出し前の
+     最後の確認なので、はみ出していたら止める。 */
+  function checkDeclaredRange(node, actual, path) {
+    if (validDateStr(node.startDate) && actual.start && actual.start < node.startDate) {
+      push(path, '開始日の宣言（' + disp(node.startDate) + '）より前に、配下の実際の開始（' + disp(actual.start) + '）があります');
+    }
+    if (validDateStr(node.endDate) && actual.end && actual.end > node.endDate) {
+      push(path, '終了日の宣言（' + disp(node.endDate) + '）より後に、配下の実際の終了（' + disp(actual.end) + '）があります');
+    }
+  }
+  doc.projects.forEach(function (pr, ri) {
+    if (!isArray(pr.phases)) return;
+    var rp = 'projects[' + ri + ']';
+    checkDeclaredRange(pr, deriveActualRange(pr.phases, 'phase'), rp);
+    pr.phases.forEach(function (ph, pi) {
+      var pp = rp + '.phases[' + pi + ']';
+      var hasSt = isArray(ph.stages) && ph.stages.length > 0;
+      var kids = hasSt ? ph.stages : (ph.milestones || []);
+      checkDeclaredRange(ph, deriveActualRange(kids, hasSt ? 'stage' : 'milestone'), pp);
+      if (hasSt) {
+        ph.stages.forEach(function (st, si) {
+          var sp = pp + '.stages[' + si + ']';
+          checkDeclaredRange(st, deriveActualRange(st.milestones || [], 'milestone'), sp);
+        });
+      }
+    });
+  });
+
+  /* 同じ担当（assigneeRole）が、同じプロジェクトの中で同時期に
+     2つ以上のタスクを受け持っていないか（予備日は対象外）。
+     担当は詳細パネルからは変えられず、日付だけがドラッグ等で動くため、
+     操作の結果としてここが崩れることがある。 */
+  doc.projects.forEach(function (pr, ri) {
+    var rp = 'projects[' + ri + ']';
+    var byRole = {};
+    (pr.phases || []).forEach(function (ph, pi) {
+      var pp = rp + '.phases[' + pi + ']';
+      var hasSt = isArray(ph.stages) && ph.stages.length > 0;
+      var msGroups = hasSt
+        ? (ph.stages || []).map(function (st, si) { return { list: st.milestones, base: pp + '.stages[' + si + ']' }; })
+        : [{ list: ph.milestones, base: pp }];
+      msGroups.forEach(function (grp) {
+        (grp.list || []).forEach(function (ms, mi) {
+          var mp = grp.base + '.milestones[' + mi + ']';
+          (ms.tasks || []).forEach(function (tk, ti) {
+            if (tk.isBuffer || !tk.assigneeRole) return;
+            if (!validDateStr(tk.startDate) || !validDateStr(tk.endDate)) return;
+            (byRole[tk.assigneeRole] = byRole[tk.assigneeRole] || []).push({
+              s: tk.startDate, e: tk.endDate, name: tk.name || '?', path: mp + '.tasks[' + ti + ']'
+            });
+          });
+        });
+      });
+    });
+    Object.keys(byRole).forEach(function (role) {
+      var spans = byRole[role].slice().sort(function (a, b) { return a.s < b.s ? -1 : (a.s > b.s ? 1 : 0); });
+      for (var i = 0; i < spans.length - 1; i++) {
+        if (spans[i].e >= spans[i + 1].s) {
+          push(spans[i + 1].path, '担当「' + role + '」の期間が、同じ担当のタスク「' + spans[i].name + '」（' +
+            disp(spans[i].s) + ' 〜 ' + disp(spans[i].e) + '）と重なっています');
+        }
+      }
+    });
   });
 
   /* risks[].relatedIds も dependsOn と同じく参照先チェックの対象にする
@@ -3839,7 +4038,7 @@ function renderLeft(doc, rows) {
     if (STATE.selection[ref.id]) row.classList.add('multi-selected');
 
     var handle = el('span', 'gl-handle', '⠿');
-    handle.title = '同じ親の中で並べ替える';
+    handle.title = 'ドラッグで並べ替え・別のマイルストン/工程へ移動';
     handle.setAttribute('aria-hidden', 'true');
     row.appendChild(handle);
 
@@ -5003,7 +5202,7 @@ var PATH_FIELD_LABEL = {
   date: '期日', startDate: '開始日', endDate: '終了日', dependsOn: '依存関係',
   title: 'タイトル', schemaVersion: 'スキーマの版', revision: '版番号',
   generatedAt: '生成日時', timelineStart: '表示の開始日', timelineEnd: '表示の終了日',
-  today: '今日の日付'
+  today: '今日の日付', durationDays: '営業日'
 };
 function humanizePath(doc, path) {
   if (!path) return '';
@@ -5862,10 +6061,23 @@ function reorder(dragId, targetId, before) {
   toast('並べ替えた', '元に戻す', undo);
 }
 
-/* ---- 親をまたいだ移動（詳細パネルのプルダウンから） ----
+/* ---- 親をまたいだ移動（詳細パネルのプルダウン／行のドラッグの共通処理） ----
    マイルストンの移動先には工程と「工程を挟まないフェーズ」が混ざる。
-   どちらも受け側の配列名は milestones なので、受け取り方は同じ。 */
-function moveNode(id, newParentId) {
+   どちらも受け側の配列名は milestones なので、受け取り方は同じ。
+   子の種類ごとに受け側の配列名は 1 つに決まる（工程の配列名は常に phases、
+   というように、置き先の段の種類によらない）ので、その対応表を 1 か所に
+   まとめておく。 */
+var CHILD_FIELD_OF_KIND = { phase: 'phases', stage: 'stages', ms: 'milestones', task: 'tasks' };
+function childArrayFor(target, childKind) {
+  var field = CHILD_FIELD_OF_KIND[childKind];
+  if (!isArray(target[field])) target[field] = [];
+  return target[field];
+}
+/* insertIndex を渡すとその位置に挿し込み、省略すると末尾に足す。
+   プルダウンからの移動は常に末尾（従来どおり）、行のドラッグは
+   狙った位置（moveNodeAtPosition）か、コンテナ行そのものへの
+   ドロップなら末尾（handleContainerDrop）を渡す。 */
+function moveNode(id, newParentId, insertIndex) {
   var oldParentId = D.parentOf[id];
   if (!newParentId || newParentId === oldParentId) return;
   var from = siblingsOf(id), idx = -1;
@@ -5883,12 +6095,12 @@ function moveNode(id, newParentId) {
   var node = from.splice(idx, 1)[0];
   var target = D.byId[newParentId];
   var kind = D.kindOf[id];
-  if (kind === 'phase') target.phases.push(node);
-  else if (kind === 'stage') target.stages.push(node);
-  else if (kind === 'ms') {
-    if (!isArray(target.milestones)) target.milestones = [];
-    target.milestones.push(node);
-  } else target.tasks.push(node);
+  var arr = childArrayFor(target, kind);
+  if (typeof insertIndex === 'number' && insertIndex >= 0 && insertIndex <= arr.length) {
+    arr.splice(insertIndex, 0, node);
+  } else {
+    arr.push(node);
+  }
   renumber(STATE.doc);
   D = derive(STATE.doc);
   /* 別のプロジェクト・フェーズへ移した場合は、移した先を表示に切り替える。
@@ -5908,7 +6120,11 @@ function moveNode(id, newParentId) {
   STATE.expanded[newParentId] = true;
   STATE.focusId = id;
   render();
-  openDrawer();
+  /* 詳細パネルは、すでに開いていた場合だけ描き直して内容を最新にする。
+     閉じていたところへ行のドラッグで移した程度で開かせると、選んでも
+     いない行の詳細が急に出てくることになる。プルダウンからの移動は
+     そもそも開いているパネルの中の操作なので、ここでの扱いは従来と変わらない。 */
+  if (STATE.drawerOpen) openDrawer();
   toast('「' + node.name + '」を ' + target.name + ' へ移した', '元に戻す', undo);
 }
 
@@ -6341,7 +6557,7 @@ function startRangeSelect(ev) {
 }
 
 /* ==================================================================
-   行の並べ替え（HTML ドラッグ＆ドロップ）
+   行の並べ替え・親をまたいだ移動（HTML ドラッグ＆ドロップ）
    掴める場所は左の行ぜんたい（⠿・名前・その右の余白・字下げ・日付など）。
    押すと別の操作が起きる部品——開閉の三角（button.gl-twisty。タスク行の
    同名 span はボタンではないので対象外＝そこも掴める）、行の操作ボタン
@@ -6352,12 +6568,30 @@ function startRangeSelect(ev) {
    判定に集約できるこちらの方が、行の中身が増えたときに直しやすい。
    文字選択はどのみち止めてあるので、常時立てても本来ぶつからないはず
    だが、今回は変更を最小限にする狙いで見送った）。
-   落とせるのは同じ階層・同じ親の行だけで、対象外の行には印を出さない。
+
+   落とせる相手は 2 通り。
+   1) 同じ種類の行（タスク→タスク、マイルストン→マイルストンなど）の上下半分
+      ・・・その行の前／後ろに入る。親が違ってもよい（＝親をまたいだ移動）。
+      同じ親どうしなら reorder()、親が違えば moveNodeAtPosition() が
+      その位置へ差し込む。
+   2) 自分の置き先になり得る「入れ物の行」そのもの（タスクなら所属できる
+      マイルストンの行、マイルストンなら工程の行）・・・その配下の末尾に入る。
+      折りたたんで配下が見えていない行でも、この形で受け止められる。
+   種類の組み合わせがどちらにも当てはまらない行には印を出さない
+   （dragover で preventDefault しないので、ブラウザ側が「ここには
+   置けない」カーソルを出す）。
+   表示されているのは選んでいるフェーズの配下だけなので、フェーズを
+   またぐ移動はここでは扱えない（従来どおり詳細パネルのプルダウンで行う）。
+
    複数選択中に行を掴んだ場合も、動くのは掴んだ 1 行だけ
-   （reorder() がもともと単体しか動かさない作りで、選択はそのまま残る。
-   複数選択をまとめて動かす／解除する分岐は入れていない）。
+   （reorder()／moveNode() がもともと単体しか動かさない作りで、選択は
+   そのまま残る。複数選択をまとめて動かす／解除する分岐は入れていない）。
    ================================================================== */
 var DND = { id: null };
+/* ドラッグしている段の種類から見て、「配下に受け止められる入れ物」の
+   行の種類。タスクはマイルストンの配下、マイルストンは工程の配下。
+   工程には対応する入れ物が無い（工程どうしの並べ替えのみ）。 */
+var CONTAINER_LEVEL_OF = { task: 'ms', ms: 'stage' };
 function attachRowDnd(row, r) {
   function isDragExcluded(target) {
     return !!(target && target.closest && target.closest('button.gl-twisty, .gl-actions, .gl-name-edit'));
@@ -6381,29 +6615,82 @@ function attachRowDnd(row, r) {
   });
   row.addEventListener('dragover', function (e) {
     if (!DND.id || DND.id === r.ref.id) return;
-    if (D.kindOf[DND.id] !== r.level) return;
-    if (D.parentOf[DND.id] !== D.parentOf[r.ref.id]) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    var rect = row.getBoundingClientRect();
-    var before = (e.clientY - rect.top) < rect.height / 2;
-    clearDropMarks();
-    row.classList.add(before ? 'drop-before' : 'drop-after');
+    var dragKind = D.kindOf[DND.id];
+    if (r.level === dragKind) {
+      /* 同じ種類の行の前後 ・・・ 親が違っても、その位置へ差し込む対象になる。 */
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      var rect = row.getBoundingClientRect();
+      var before = (e.clientY - rect.top) < rect.height / 2;
+      clearDropMarks();
+      row.classList.add(before ? 'drop-before' : 'drop-after');
+      return;
+    }
+    if (CONTAINER_LEVEL_OF[dragKind] === r.level && r.ref.id !== D.parentOf[DND.id]) {
+      /* 入れ物の行そのもの ・・・ いま属している入れ物へ落としても意味が
+         無いので除外し、それ以外は配下の末尾へ入る対象になる。 */
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      clearDropMarks();
+      row.classList.add('drop-into');
+      return;
+    }
+    /* それ以外の組み合わせ（例: タスクを工程へ、など）は preventDefault
+       しない＝ドロップを受け付けない。印も出さない。 */
   });
   row.addEventListener('drop', function (e) {
     if (!DND.id) return;
     e.preventDefault();
-    var before = row.classList.contains('drop-before');
     var dragId = DND.id;
+    var into = row.classList.contains('drop-into');
+    var before = row.classList.contains('drop-before');
     DND.id = null;
     clearDropMarks();
-    reorder(dragId, r.ref.id, before);
+    if (into) {
+      handleContainerDrop(dragId, r.ref.id);
+    } else {
+      handleSiblingDrop(dragId, r.ref.id, before);
+    }
   });
   row.setAttribute('draggable', 'false');
 }
 function clearDropMarks() {
-  var ns = document.querySelectorAll('.drop-before, .drop-after');
-  for (var i = 0; i < ns.length; i++) { ns[i].classList.remove('drop-before'); ns[i].classList.remove('drop-after'); }
+  var ns = document.querySelectorAll('.drop-before, .drop-after, .drop-into');
+  for (var i = 0; i < ns.length; i++) {
+    ns[i].classList.remove('drop-before');
+    ns[i].classList.remove('drop-after');
+    ns[i].classList.remove('drop-into');
+  }
+}
+/* 同じ種類の行の前後へのドロップ。親が同じなら従来どおりの並べ替え
+   （reorder）、親が違えば「その位置」を割り出して moveNode に渡す
+   ＝親をまたいだ移動も、既存の 2 本（reorder / moveNode）だけで賄う。 */
+function handleSiblingDrop(dragId, targetId, before) {
+  if (dragId === targetId) return;
+  if (D.kindOf[dragId] !== D.kindOf[targetId]) return;
+  if (D.parentOf[dragId] === D.parentOf[targetId]) {
+    reorder(dragId, targetId, before);
+    return;
+  }
+  moveNodeAtPosition(dragId, targetId, before);
+}
+/* targetId と同じ配列（＝ siblingsOf(targetId)）の、その前か後ろの位置へ
+   dragId を移す。移す前の配列には targetId しか居ないので（dragId は
+   別の配列にいる）、dragId を抜いたことによる番号のずれは考えなくてよい
+   （同じ親どうしの reorder() とはここが違う）。 */
+function moveNodeAtPosition(dragId, targetId, before) {
+  var arr = siblingsOf(targetId), idx = -1;
+  for (var i = 0; i < arr.length; i++) if (arr[i].id === targetId) idx = i;
+  if (idx < 0) return;
+  moveNode(dragId, D.parentOf[targetId], before ? idx : idx + 1);
+}
+/* 入れ物の行そのものへのドロップ。挿し込み位置を指定しないので、
+   moveNode は末尾に足す（＝「畳んでいる行に落としたら末尾に入る」を含めて
+   常にこの一本で賄う）。 */
+function handleContainerDrop(dragId, containerId) {
+  if (CONTAINER_LEVEL_OF[D.kindOf[dragId]] !== D.kindOf[containerId]) return;
+  if (containerId === D.parentOf[dragId]) return;
+  moveNode(dragId, containerId);
 }
 
 /* ==================================================================
