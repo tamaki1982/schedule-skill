@@ -1816,7 +1816,7 @@
 
 <!-- 印刷 / PDF の確認。収め方・用紙の向きを毎回選んでもらう。
      選択肢は開くたびに既定（1ページに収める／自動）へ戻す
-     （taka 合意: 収め方は毎回選ぶもの。前回値は覚えない）。 -->
+     （収め方は毎回選ぶもの。前回値は覚えない）。 -->
 <div class="modal" id="printOptionsModal" role="dialog" aria-modal="true"
      aria-labelledby="printOptionsTitle" hidden>
   <div class="modal-head" id="printOptionsTitle">印刷 / PDF</div>
@@ -7331,9 +7331,9 @@ function toggleTheme() {
    画面の見えている範囲だけを出すと、スクロールで隠れている大半が紙から
    消えてしまうため、この方針は変えない。
 
-   以前はここで「全展開・全期間」に切り替えていたが、taka から
+   以前はここで「全展開・全期間」に切り替えていたが、
    「画面と違う単位で描画される」「畳んだ行が全部開いて出る」という
-   不具合として報告された（2026-09-08）。画面表示と紙面が食い違うこと
+   不具合の報告を受けて改めた。画面表示と紙面が食い違うこと
    自体が不具合、という判断で、状態を書き換えない方針に変えた。
    ここで行うのは「紙に出すべきでないもの」を消す調整と、紙に収めるための
    縮小率・用紙の向きの計算だけ（右ペイン・設定・テーマの固定など）。
@@ -7343,8 +7343,7 @@ function toggleTheme() {
    画面のタイムラインは横スクロールで見る前提なので、拡大率をそのまま
    出すと紙の幅（用紙の向きぶんの幅 - 左右余白）を超えて見切れることが
    普通に起きる。それを防ぐため、出力対象の実際の横幅・縦幅を計算し、
-   必要な分だけ .board 全体を縮小する（縮小率に下限は設けない。
-   taka との合意）。
+   必要な分だけ .board 全体を縮小する（縮小率に下限は設けない）。
 
    印刷確認モーダル（PRINT_OPTIONS、上のモーダル配線を参照）で
    「収め方」（1ページに収める／読みやすさ優先）と「用紙の向き」
@@ -7770,7 +7769,7 @@ function previewAutoOrientationLabel() {
 }
 
 function openPrintOptionsModal() {
-  /* 開くたびに既定へ戻す（taka 合意: 収め方は毎回選ぶもの）。 */
+  /* 開くたびに既定へ戻す（収め方は毎回選ぶもの）。 */
   PRINT_OPTIONS = { fit: 'fit', orientation: 'auto' };
   setSegActive(document.getElementById('printFitSeg'), 'fit');
   setSegActive(document.getElementById('printOrientSeg'), 'auto');
