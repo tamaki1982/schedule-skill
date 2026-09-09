@@ -106,10 +106,17 @@
     --shadow-drawer: -8px 0 28px rgba(0,0,0,0.14);
     --band-tint: rgba(0,0,0,0.05);
     /* 操作が「選ばれている」ことを示す色。青ではなく黒に近いグレーで押さえる。
-       日付の目印（今日の線・列の目印・土曜）だけは青のまま残す。 */
+       日付の目印（今日の線・列の目印・土曜）だけは青のまま残す。
+       このグレーはメニュー系の選択中項目（フェーズ切替メニュー等）専用。
+       ガントの行選択は --bg-row-selected を使う（理由はその変数の注記参照）。 */
     --control-ink: #33322E;
     --control-on: #FFFFFF;
     --bg-selected: rgba(0,0,0,0.065);
+    /* ガントの行選択（.selected）専用の背景。工程行の帯（--band-tint、無彩色5%）と
+       濃さがほぼ同じだと並べても見分かないため、濃さではなく色相で分ける。
+       縁取り・複数選択の帯に使っている --edit-accent と同じ色相の薄い塗りにして、
+       「これが選択の色」として一貫して読めるようにする。 */
+    --bg-row-selected: rgba(176,86,30,0.14);
     --hover-col: rgba(55,138,221,0.14);
     --scrollbar-thumb: rgba(0,0,0,0.18);
   }
@@ -171,6 +178,7 @@
     --control-ink: #E6E3DB;
     --control-on: #1A1A18;
     --bg-selected: rgba(255,255,255,0.09);
+    --bg-row-selected: rgba(227,165,117,0.18);
     --hover-col: rgba(126,182,238,0.15);
     --scrollbar-thumb: rgba(255,255,255,0.16);
   }
@@ -427,7 +435,7 @@
     border-bottom: 0.5px solid var(--border);
     font-size: 12px; color: var(--text-secondary); line-height: 1.6;
   }
-  .edit-banner .eb-count { margin-left: 10px; font-weight: 700; color: var(--edit-accent); }
+  .edit-banner .eb-count { margin-left: 10px; font-weight: 700; color: var(--edit-accent); flex: 0 0 auto; white-space: nowrap; }
   body.is-dirty .edit-banner {
     background: var(--edit-bg);
     border-bottom-color: var(--edit-border);
@@ -435,7 +443,17 @@
   }
   .edit-banner .eb-icon { flex-shrink: 0; color: var(--text-muted); font-size: 13px; }
   body.is-dirty .edit-banner .eb-icon { color: var(--edit-accent); }
-  .edit-banner .eb-text { flex: 1; min-width: 200px; }
+  /* 帯は常に1行に収める（2行になるとチャートの1行目が下がるため）。
+     説明文（#ebText）と件数（.eb-count が2つ）を横並びにし、
+     幅が足りないときは件数側ではなく説明文側を省略記号で詰める。
+     件数（変更件数・複数選択の件数）は常に全文を見せたい情報のため。 */
+  .edit-banner .eb-text {
+    flex: 1; min-width: 200px;
+    display: flex; align-items: baseline; overflow: hidden;
+  }
+  .edit-banner .eb-text #ebText {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+  }
   .edit-banner strong { color: var(--text-primary); font-weight: 700; }
   body.is-dirty .edit-banner strong { color: var(--edit-accent); }
   .eb-actions { display: inline-flex; gap: 6px; flex-wrap: wrap; flex-shrink: 0; }
@@ -498,6 +516,9 @@
   }
   .phase-dd-item:hover { background: var(--surface-hover); }
   .phase-dd-item:focus-visible { outline: 2px solid var(--control-ink); outline-offset: -2px; }
+  /* メニューの選択中項目は無彩色のまま（--bg-selected）。ガントの行選択と違って
+     隣に無彩色の帯と並ぶ場面が無く、濃さだけで十分見分けが付くため、
+     ここは --bg-row-selected に揃えない。 */
   .phase-dd-item.active { background: var(--bg-selected); font-weight: 600; }
   /* 一覧に出すのは名前だけ。期間も今日の印も置かない。
      選ぶのに要るのは名前で、期間は選んだあとチャートそのものが示す。 */
@@ -813,7 +834,9 @@
   }
   .gantt-left-row:hover { background: var(--surface-hover); }
   .gantt-left-row.lvl-stage { background: var(--band-tint); border-bottom-color: var(--border-strong); }
-  .gantt-left-row.selected, .gantt-right-row.selected { background: var(--bg-selected); }
+  /* 工程行の帯（--band-tint）と濃さで分けず色相で分ける。--bg-row-selected の
+     注記（:root 側）参照。 */
+  .gantt-left-row.selected, .gantt-right-row.selected { background: var(--bg-row-selected); }
   .gantt-left-row.selected::after {
     content: ''; position: absolute; inset: 0; pointer-events: none;
     box-shadow: inset 0 0 0 1.5px var(--control-ink);
@@ -822,6 +845,20 @@
   .gantt-left-row.dragging { opacity: 0.4; }
   .gantt-left-row.drop-before { box-shadow: inset 0 2px 0 0 var(--edit-accent); }
   .gantt-left-row.drop-after  { box-shadow: inset 0 -2px 0 0 var(--edit-accent); }
+  /* 複数選択（範囲ドラッグ／Cmd+A）の印。左端の細い線だけの静かな見せ方にする。
+     単体選択（.selected の背景）と重なっても喧嘩しない。 */
+  .gantt-left-row.multi-selected, .gantt-right-row.multi-selected {
+    box-shadow: inset 3px 0 0 0 var(--edit-accent);
+  }
+  /* 複数選択が1件以上あるあいだだけ、選ばれていない行を沈めて選んだ行を
+     浮かせる。名前欄の細い線だけでは、操作しているチャート側のバーから
+     目印が遠く気づきにくいための追加。文字が読める濃さは保つ
+     （0.55 で止め、それ以上は下げない）。選択が0件の通常時は何も変えない。 */
+  body.has-multi-select .gantt-left-row:not(.multi-selected),
+  body.has-multi-select .gantt-right-row:not(.multi-selected) {
+    opacity: 0.55;
+    transition: opacity 0.15s ease;
+  }
 
   /* 左端の色帯は撤去した。1 画面に出る段が最大 3 種類（工程・マイルストン・
      タスク）に減り、記号の有無・文字色・字下げ・行の高さだけで見分けが付く。
@@ -1022,6 +1059,20 @@
   .name-text.done, .bar-label-out.done,
   .pd-name.done, .phase-dd-current.done, .dh-title.done { color: var(--text-muted); }
 
+  /* 複数選択中のバー。操作するのはチャート側のこのバーそのものなので、
+     目印も直接ここへ置く（名前欄側の multi-selected は横スクロールでバーが
+     画面外にあるときの手がかりとして残す）。
+     box-shadow を使うホバー／ドラッグ中／範囲選択のヒット（flush な実線の輪）や、
+     outline を使うはみ出し警告 .rollup.widened（3px 離れた破線）と混同しないよう、
+     outline の実線で、はみ出し警告とはオフセットを変えて区別する。
+     box-shadow と outline は別プロパティなので、ドラッグ中に選択されているバーは
+     両方が重なって出る（選択の実線 + 操作中の光彩）。
+     印刷では操作中の状態として扱い、出さない（@media print 側で打ち消す）。 */
+  .gantt-bar.is-selected {
+    outline: 2px solid var(--edit-accent);
+    outline-offset: 2px;
+  }
+
   /* バーに名前が入りきらないときは、すぐ右へ出す。
      どの拡大率でもタスク名が読める状態を保つための逃がし先。
      右端に寄って収まらない場合はバーの左側へ回り込む。 */
@@ -1032,6 +1083,9 @@
   }
   .gantt-bar:hover { box-shadow: 0 0 0 2px var(--edit-accent); }
   .gantt-bar.dragging { cursor: grabbing; box-shadow: 0 0 0 2px var(--edit-accent); z-index: 6; }
+  /* 範囲選択のドラッグ中、枠に触れているバーの見た目。確定後の見た目（行の
+     multi-selected）へそのままつながるよう、ホバー／ドラッグ中と同じ表現を使う。 */
+  .gantt-bar.range-hit { box-shadow: 0 0 0 2px var(--edit-accent); }
   /* 伸び縮みのつまみ。バー内側に置き、overflow:hidden を保ったまま示す。 */
   .bar-handle {
     position: absolute; top: 0; bottom: 0; width: 7px; z-index: 3;
@@ -1083,6 +1137,24 @@
   .gantt-milestone:hover .flag { filter: drop-shadow(0 0 3px var(--edit-accent)); }
   .gantt-milestone.dragging .flag { cursor: grabbing; }
   .gantt-milestone.dragging { z-index: 6; }
+  /* 範囲選択のドラッグ中、枠に触れている旗の見た目（バーの range-hit と対） */
+  .flag.range-hit { filter: drop-shadow(0 0 3px var(--edit-accent)); }
+  /* 複数選択中の旗（バーの is-selected と対）。ホバー／ドラッグ中／範囲選択の
+     ヒットはどれも輪郭のない柔らかい光彩（drop-shadow）だが、こちらは
+     旗のかたちを丸く縁取る実線にして、光彩ともはみ出し警告（矩形の破線）とも
+     形で区別する。drop-shadow とは別プロパティなので、ドラッグ中でも
+     両方が同時に出る。 */
+  .gantt-milestone.is-selected .flag {
+    outline: 2px solid var(--edit-accent);
+    outline-offset: 3px;
+    border-radius: 50%;
+  }
+  /* 範囲選択そのものの矩形。はみ出し警告（.rollup.widened）と同じ
+     「破線＋アクセント色」の言葉を流用し、新しい色を増やさない。 */
+  .range-select-box {
+    position: absolute; z-index: 8; pointer-events: none;
+    border: 1.5px dashed var(--edit-accent); background: transparent;
+  }
   .gantt-milestone .m-label {
     margin-left: 5px; font-size: 10.5px; color: var(--text-hot); font-weight: 500;
     background: var(--surface-2); padding: 1px 6px; border-radius: 4px;
@@ -1285,6 +1357,17 @@
     background: var(--fill-primary); color: var(--on-primary); border: none; font-weight: 500;
   }
 
+  /* ===== 印刷確認モーダルの2択 =====
+     切替の見た目は画面ビュー切替などと同じ .seg を流用する
+     （面が滑る演出は付けていない。開くたびに毎回作り直す1回きりの
+     選択なので、動きを付ける効果が薄い）。 */
+  .print-opt-row {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; padding: 9px 0;
+  }
+  .print-opt-row:first-child { padding-top: 0; }
+  .print-opt-label { font-size: 12.5px; color: var(--text-secondary); }
+  .print-opt-hint { margin-left: 4px; font-size: 11px; font-weight: 400; color: var(--text-muted); }
 
   .page-footer { text-align: center; padding: 26px; font-size: 11.5px; color: var(--text-muted); }
 
@@ -1324,12 +1407,16 @@
      から余白を引いた分）を超えることは普通に起きる。その場合は
      beforePrint() が全体の縮小率を計算し、.board に zoom で適用する
      （縦の紙送りは変えない。理由は beforePrint() のコメント参照）。
-     以下の @page ・ .gantt-left/.gantt-axis-left の固定幅は、その
-     縮小率の計算前提として beforePrint() 側の定数と対応させている。
-     どちらかを変えたら、もう片方（PRINT_PAGE_MM / PRINT_LEFT_WIDTH）も
-     直すこと。
-     ========================================================== */
-  @page { size: A4 landscape; margin: 10mm; }
+     以下の .gantt-left/.gantt-axis-left の固定幅は、その縮小率の計算
+     前提として beforePrint() 側の定数と対応させている。変えたら、
+     もう片方（PRINT_LEFT_WIDTH）も直すこと。
+
+     用紙の向き（@page の size）は縦横どちらもあり得るため、この
+     スタイルシートには書かず、#printPageStyle（このすぐ下の
+     <style> 要素、body の外・この <style> の直後に置いてある）に
+     JS 側（setPrintPageOrientation）から書き込む。@page の余白
+     （10mm）と幅・高さ（A4 = 297 × 210mm）は PRINT_PAGE_MM と
+     必ず一致させること。 */
   @media print {
     body { background: #FFFFFF; }
     .wrap { max-width: none; padding: 0; }
@@ -1361,6 +1448,50 @@
     .doc-meta { font-size: 12px; color: #3A3A38; }
     /* 薄い面は紙で飛ぶ。バーの塗りと斜線は色を保ったまま出す（枠線は実線で残る）。 */
     .gantt-bar { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    /* バーと同じ理由で、色や塗りそのものに意味を持たせている他の要素も
+       紙へ持ち越す。対象は次の 5 つ。
+         - 土日祝の列の地色（.day-bg。日単位のときだけ描画される）
+         - 日付軸の土日祝・今日のセル（.scale-bottom-cell。同じく日単位のみ）
+         - 今日の縦線と札（.gantt-today-line / .gantt-today-flag）
+         - 集約（工程・マイルストンの期間線）の横棒（.rollup::before）。
+           左右の脚は枠線なので元から残るが、横棒は面で描いているため、
+           これを足さないと脚だけが浮いて見える
+         - 凡例の色見本（.lg-swatch）。紙にはホバーが無いので凡例だけが
+           色の意味を説明する場になる。見本自体の色が消えると凡例が成立しない
+       print-color-adjust は継承するので、.rollup / .lg-swatch に掛ければ
+       ::before / ::after の疑似要素にも及ぶ。
+       選択中の行の網掛け・工程行の帯・マイルストン期日チップの背景は、
+       操作中であることを示す UI 上の状態であり、スケジュールの内容そのものを
+       表す色ではないため、ここには含めない（紙では従来どおり出ない）。 */
+    .gantt-daycols .day-bg,
+    .scale-bottom-cell,
+    .gantt-today-line,
+    .gantt-today-flag,
+    .rollup,
+    .lg-swatch {
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
+    /* 複数選択の縁取り・沈み・件数も同じ理由（操作中の状態であって内容ではない）
+       で紙には出さない。件数は .edit-banner ごと非表示（既存）で消えるが、
+       縁取り（outline は box-shadow と違って既定で印刷されうる）と行の沈みは
+       ここで明示的に打ち消す。 */
+    .gantt-bar.is-selected,
+    .gantt-milestone.is-selected .flag {
+      outline: none !important;
+    }
+    .gantt-left-row, .gantt-right-row { opacity: 1 !important; }
+    /* 土日祝の地色（--wk-*-body）は画面では主張しすぎない薄さにしてあるが、
+       紙は画面よりコントラストが付きにくく、そのままだと白地に沈んで
+       ほぼ見えなくなる。色相と、地色＜見出しの濃淡関係は保ったまま、
+       紙のときだけ濃くする。凡例の色見本（.lg-swatch.sat 等）も同じ変数を
+       見ているので、ここを直せば凡例と本体の濃さが揃う。
+       日付軸見出し（--wk-*-header）は元から地色より濃く、紙でも視認できる
+       濃さがあるため据え置く。 */
+    :root {
+      --wk-sat-body: #DEEBF8;
+      --wk-sun-body: #F8DEE7;
+      --wk-holiday-body: #E3DFD6;
+    }
     /* 紙にはホバーが無いので、記号と色の対応をここで出す */
     .print-legend { display: flex !important; padding: 8px 16px 0; }
     /* 紙幅に収めるため名前欄を詰める */
@@ -1382,6 +1513,11 @@
     .page-footer { padding: 10px; }
   }
 </style>
+<!-- 印刷の用紙の向き。size は要素セレクタでは切り替えられないため、
+     このスタイル要素の中身ごと JS（setPrintPageOrientation）が
+     書き換える。既定は横（A4 landscape）。beforePrint() で選んだ
+     向きに差し替え、afterPrint() でこの既定に戻す。 -->
+<style id="printPageStyle">@page { size: A4 landscape; margin: 10mm; }</style>
 </head>
 <body>
 <header class="topbar">
@@ -1467,7 +1603,7 @@
     <div class="edit-banner">
       <span class="eb-icon">✎</span>
       <span class="eb-text">
-        <span id="ebText"></span><span class="eb-count" id="ebCount"></span>
+        <span id="ebText"></span><span class="eb-count" id="ebCount"></span><span class="eb-count" id="ebSelCount"></span>
       </span>
       <span class="eb-actions">
         <button id="btnUndo" type="button">一つ前の状態に戻す</button>
@@ -1641,6 +1777,35 @@
   <div class="modal-actions">
     <button type="button" class="plain-btn" id="groupNameCancel">あとで決める</button>
     <button type="button" id="groupNameOk">この名前にする</button>
+  </div>
+</div>
+
+<!-- 印刷 / PDF の確認。収め方・用紙の向きを毎回選んでもらう。
+     選択肢は開くたびに既定（1ページに収める／自動）へ戻す
+     （taka 合意: 収め方は毎回選ぶもの。前回値は覚えない）。 -->
+<div class="modal" id="printOptionsModal" role="dialog" aria-modal="true"
+     aria-labelledby="printOptionsTitle" hidden>
+  <div class="modal-head" id="printOptionsTitle">印刷 / PDF</div>
+  <div class="modal-body">
+    <div class="print-opt-row">
+      <span class="print-opt-label">収め方</span>
+      <div class="seg print-opt-seg" id="printFitSeg" role="group" aria-label="収め方">
+        <button type="button" class="active" data-value="fit">1 ページに収める</button>
+        <button type="button" data-value="flow">読みやすさ優先</button>
+      </div>
+    </div>
+    <div class="print-opt-row">
+      <span class="print-opt-label">用紙の向き</span>
+      <div class="seg print-opt-seg" id="printOrientSeg" role="group" aria-label="用紙の向き">
+        <button type="button" class="active" data-value="auto">自動<span class="print-opt-hint" id="printAutoHint"></span></button>
+        <button type="button" data-value="landscape">横</button>
+        <button type="button" data-value="portrait">縦</button>
+      </div>
+    </div>
+  </div>
+  <div class="modal-actions">
+    <button type="button" class="plain-btn" id="printOptionsCancel">やめる</button>
+    <button type="button" id="printOptionsOk">印刷</button>
   </div>
 </div>
 
@@ -2817,6 +2982,10 @@ var STATE = {
   expanded: {},
   zoom: 'week',
   selectedId: null,
+  /* 複数選択（範囲ドラッグ／Cmd+A）。id -> true のマップ。
+     対象はタスクとマイルストンだけ（単独で動かせる行だけ）。
+     表示中のフェーズに閉じる状態で、プロジェクト・フェーズを切り替えたら解く。 */
+  selection: {},
   focusId: null,
   drawerOpen: false,
   undoStack: [],
@@ -2889,6 +3058,55 @@ function derive(doc) {
     return n;
   }
   d.countWork = countWork;
+
+  /* 稼働日を n 日ぶん進める（n が負なら遡る）。dependsOn の lagDays を
+     稼働日として解釈するためだけに使う。0 日ならその日のまま。 */
+  function addWorkdays(dt, n) {
+    if (!dt || !n) return dt;
+    var cur = dt, step = n < 0 ? -1 : 1, left = Math.abs(n);
+    while (left > 0) { cur = addDays(cur, step); if (isWork(cur)) left--; }
+    return cur;
+  }
+
+  /* 依存の逆転（先行が終わる前に後続が始まる、等）の検知。
+     validate_schedule.py（C6/C7）は依存先が実在するか・循環していないかしか見ておらず、
+     日付の前後は確認していない。まとめてずらす操作（複数選択ドラッグ・矢印キー）は
+     この逆転を簡単に作れてしまうため、ここで検知し、期間のはみ出しと同じ見た目（⚠）に乗せる。
+     止めはしない（ずらしている途中の一時的な逆転まで塞ぐと操作の妨げになるため）。 */
+  function checkTaskDependencyOrder(node, c) {
+    if (!isArray(node.dependsOn) || !node.dependsOn.length || !c.s || !c.e) return;
+    node.dependsOn.forEach(function (dep) {
+      if (!dep || !dep.taskId) return;
+      var pc = d.calc[dep.taskId];
+      if (!pc || !pc.s || !pc.e) return;
+      var type = dep.type || 'FS';
+      var lag = (typeof dep.lagDays === 'number') ? dep.lagDays : 0;
+      var need, have;
+      if (type === 'SS') { need = addWorkdays(pc.s, lag); have = c.s; }
+      else if (type === 'FF') { need = addWorkdays(pc.e, lag); have = c.e; }
+      else if (type === 'SF') { need = addWorkdays(pc.s, lag); have = c.e; }
+      else { need = addWorkdays(pc.e, lag); have = c.s; }   /* FS（既定） */
+      if (have < need) {
+        var pn = d.byId[dep.taskId];
+        (d.warn[node.id] = d.warn[node.id] || []).push(
+          '依存先「' + (pn ? pn.name : dep.taskId) + '」との前後関係が逆転しています（' +
+          disp(have) + ' は ' + disp(need) + ' 以降であるべきです）');
+      }
+    });
+  }
+  function checkMsDependencyOrder(node, c) {
+    if (!isArray(node.dependsOn) || !node.dependsOn.length || !c.date) return;
+    node.dependsOn.forEach(function (depId) {
+      var pc = d.calc[depId];
+      if (!pc || !pc.date) return;
+      if (pc.date > c.date) {
+        var pn = d.byId[depId];
+        (d.warn[node.id] = d.warn[node.id] || []).push(
+          '依存先「' + (pn ? pn.name : depId) + '」の期日（' + disp(pc.date) +
+          '）より先に、この期日（' + disp(c.date) + '）が来ています');
+      }
+    });
+  }
 
   /* msDate は親マイルストンの期日。タスクの期日超過判定にだけ使う。 */
   function walk(node, kind, parentId, depth, msDate) {
@@ -2975,6 +3193,17 @@ function derive(doc) {
   var projects = doc.projects || [];
   projects.forEach(function (pr) { walk(pr, 'project', null, 0, null); });
   projects.forEach(function (pr) { d.totalEffort += d.calc[pr.id].effort; });
+
+  /* 依存の前後チェックは、全ノードの d.calc が出そろってから 1 回でまとめて行う。
+     dependsOn はプロジェクトをまたいで指してよいため、途中の段階では
+     依存先の d.calc がまだ無いことがある。 */
+  eachNode(doc, function (node, kind) {
+    var c = d.calc[node.id];
+    if (!c) return;
+    if (kind === 'task') checkTaskDependencyOrder(node, c);
+    else if (kind === 'ms') checkMsDependencyOrder(node, c);
+  });
+
   d.today = parseIso(doc.calendar.today);
 
   /* 表示中のプロジェクトとフェーズが消えていたら（削除・読み込み直し）整合させる。
@@ -3581,6 +3810,7 @@ function renderLeft(doc, rows) {
     row.setAttribute('aria-level', String(r.depth + 1));
     if (r.level !== 'task') row.setAttribute('aria-expanded', r.open ? 'true' : 'false');
     if (STATE.selectedId === ref.id) row.classList.add('selected');
+    if (STATE.selection[ref.id]) row.classList.add('multi-selected');
 
     var handle = el('span', 'gl-handle', '⠿');
     handle.title = '同じ親の中で並べ替える';
@@ -3782,6 +4012,7 @@ function renderRight(doc, rows, layout) {
     var row = el('div', 'gantt-right-row lvl-' + r.level);
     row.setAttribute('data-id', ref.id);
     if (STATE.selectedId === ref.id) row.classList.add('selected');
+    if (STATE.selection[ref.id]) row.classList.add('multi-selected');
     row.addEventListener('click', function () {
       if (clickBlocked()) return;
       selectNode(ref.id, true);
@@ -3794,7 +4025,8 @@ function renderRight(doc, rows, layout) {
         var buffer = !!ref.isBuffer;
         var st = statusOf(ref);
         var box = barBox(c, layout);
-        var bar = el('div', 'gantt-bar' + (buffer ? ' hatch' : '') + STATUS_CLASS[st]);
+        var bar = el('div', 'gantt-bar' + (buffer ? ' hatch' : '') + STATUS_CLASS[st] +
+          (STATE.selection[ref.id] ? ' is-selected' : ''));
         bar.style.left = box.left + 'px';
         bar.style.width = box.w + 'px';
         /* 期間は行に出していないので、載せたときに読める形にする。
@@ -3858,7 +4090,7 @@ function renderRight(doc, rows, layout) {
         /* 日単位は目盛りが 1 日ずつ並んでいて旗の位置から日付が読めるため、
            旗の横の日付は出さない。目盛りが粗い週・月・全体では出す。 */
         var withDate = layout.zoom !== 'day';
-        var flag = el('div', 'gantt-milestone',
+        var flag = el('div', 'gantt-milestone' + (STATE.selection[ref.id] ? ' is-selected' : ''),
           '<span class="flag" title="つかんで期日を変える">' + iconFlag(15) + '</span>' +
           (withDate ? '<span class="m-label">' + disp(c.date) + '</span>' : ''));
         /* 札を出す拡大率では、旗を期日の位置に置かず札の頭として括弧の外へ並べる。
@@ -4005,6 +4237,7 @@ function selectProject(id) {
   if (STATE.projectId === id) return;
   STATE.projectId = id;
   STATE.phaseId = null;
+  STATE.selection = {};   /* 複数選択は表示中のフェーズに閉じるため、切り替えたら解く */
   if (STATE.selectedId && projectIdOf(STATE.selectedId) !== id) {
     STATE.selectedId = null;
     STATE.focusId = null;
@@ -4021,6 +4254,7 @@ function selectProject(id) {
 function selectPhase(id) {
   if (STATE.phaseId === id) return;
   STATE.phaseId = id;
+  STATE.selection = {};   /* 複数選択は表示中のフェーズに閉じるため、切り替えたら解く */
   if (STATE.selectedId && phaseIdOf(STATE.selectedId) !== id) {
     STATE.selectedId = null;
     STATE.focusId = null;
@@ -4989,6 +5223,11 @@ function renderBanner() {
   document.getElementById('btnRevert').disabled = !dirty;
   document.getElementById('btnKeep').disabled = !dirty || wrote;
   document.getElementById('ebCount').textContent = dirty ? '変更 ' + STATE.dirty + ' 件' : '';
+  /* 複数選択（範囲ドラッグ／Cmd+A）の件数。選んでいる間だけ出し、解いたら消す。
+     変更件数と同じ帯・同じ見せ方にする（新しい常駐の説明文は増やさない）。 */
+  var selCount = Object.keys(STATE.selection).length;
+  document.body.classList.toggle('has-multi-select', selCount > 0);
+  document.getElementById('ebSelCount').textContent = selCount > 0 ? selCount + ' 件を選択中' : '';
   /* 文は状態で入れ替える。言えることだけを書く。
        書き出し済み     … いまの変更ぶんを、確かに書き出した。
        直した           … 書き出しが要る。
@@ -5224,6 +5463,7 @@ function loadDocument(src, keepPhase) {
   STATE.savedMode = null;
   STATE.savedName = null;
   STATE.selectedId = null;
+  STATE.selection = {};
   STATE.focusId = null;
   STATE.drawerOpen = false;
   STATE.doc = clone(src);
@@ -5323,6 +5563,10 @@ function setAllExpanded(open) {
 }
 function selectNode(id, open, focusName) {
   STATE.selectedId = id;
+  /* 単体の行を選び直したら、複数選択（範囲ドラッグ／Cmd+A）は解く。
+     何も無いところをクリックしたときの「選択を解除する」も、行ではなく
+     このクリックが担当する（クリック先が行なら selectNode が必ず呼ばれるため）。 */
+  STATE.selection = {};
   /* プロジェクトとフェーズは行として出ないので、行のフォーカスには載せない。
      載せると、次に矢印を押したときの起点が画面に無い行になる。 */
   var k = D.kindOf[id];
@@ -5537,6 +5781,9 @@ function removeNode(id) {
   var refCount = 0;
   Object.keys(pruned).forEach(function (k) { refCount += pruned[k].before.length - pruned[k].after.length; });
   Object.keys(prunedRisks).forEach(function (k) { refCount += prunedRisks[k].before.length - prunedRisks[k].after.length; });
+  /* 消えた行が複数選択に入っていたら、その分だけ選択から落とす
+     （消えていない他のメンバーの選択はそのまま残す）。 */
+  Object.keys(removedIds).forEach(function (rid) { delete STATE.selection[rid]; });
   renumber(STATE.doc);
   D = derive(STATE.doc);
   if (STATE.selectedId === id) { STATE.selectedId = null; closeDrawer(); }
@@ -5646,6 +5893,83 @@ function shiftTask(task, days, resizeOnly) {
   if (ne < ns) ne = ns;
   applyTaskDates(task, ns, ne);
 }
+
+/* ==================================================================
+   複数選択（範囲ドラッグ／Cmd+A）のまとめ移動
+   選ぶこと自体は STATE.selection（id -> true）を書き換えるだけの
+   軽い状態で、対象はタスクとマイルストン（単独で動かせる行）だけに絞る。
+   ================================================================== */
+
+/* いまの複数選択のうち、実在するタスク／マイルストンだけを取り出す。
+   削除などで選択に残ってしまった古い id は D.kindOf に無いのでここで落ちる。 */
+function selectedMovables() {
+  var out = [];
+  Object.keys(STATE.selection).forEach(function (id) {
+    var kind = D.kindOf[id];
+    if (kind === 'task' || kind === 'ms') out.push({ id: id, kind: kind, node: D.byId[id] });
+  });
+  return out;
+}
+
+/* 選んだメンバー全員を、同じ dd（カレンダー日数）・dir（進行方向）で動かす。
+   1 本だけのドラッグ（startBarDrag／startMilestoneDrag の従来経路）と
+   同じ「加算してから稼働日へ寄せる」処理を、メンバーごとに個別に行う。
+   各メンバーは自分の元の日付を基準に寄せるため、同じ dd を足しても、
+   土日をまたぐ位置がメンバーごとに違えば実際の移動量（稼働日数）も違いうる。
+   これは 1 本ずつドラッグしたときと同じ結果になるということでもある。
+
+   取り消しはこの関数全体で 1 回（pushUndo は 1 回だけ呼ぶ）。
+   「変更 N 件」の数え方も、1 回の一括操作 = 1 件として既存の dirty カウントに揃える
+   （1 本のドラッグが常に 1 件として数えられているのと同じ考え方）。 */
+function applyBulkShift(members, dd, dir) {
+  pushUndo();
+  var moved = [];
+  members.forEach(function (m) {
+    if (m.kind === 'task') {
+      var s0 = parseIso(m.node.startDate), e0 = parseIso(m.node.endDate);
+      var ns = snapWorking(addDays(s0, dd), dir);
+      var ne = snapWorking(addDays(e0, dd), dir);
+      if (ne < ns) ne = ns;
+      m.node.startDate = iso(ns);
+      m.node.endDate = iso(ne);
+      moved.push({ node: m.node, kind: 'task', s: ns, e: ne });
+    } else if (m.kind === 'ms' && m.node.date) {
+      var d0 = parseIso(m.node.date);
+      var nd = snapWorking(addDays(d0, dd), dir);
+      m.node.date = iso(nd);
+      moved.push({ node: m.node, kind: 'ms', d: nd });
+    }
+  });
+  /* 例外稼働日への追加は、全メンバーぶんの日付を確定させたあとでまとめて行う。
+     1 件ごとに足すと、あとから処理するメンバーの営業日数え上げが、
+     直前のメンバーが足した例外稼働日の影響を受けて食い違う。 */
+  var added = 0;
+  moved.forEach(function (mv) {
+    added += (mv.kind === 'task') ? markExceptional(STATE.doc, mv.s, mv.e)
+                                   : markExceptional(STATE.doc, mv.d, mv.d);
+  });
+  D = derive(STATE.doc);
+  moved.forEach(function (mv) {
+    if (mv.kind === 'task') mv.node.durationDays = D.countWork(mv.s, mv.e);
+  });
+  render();
+  return added;
+}
+
+/* 表示中のフェーズを丸ごと展開してから、その中のタスク・マイルストンを
+   すべて選ぶ（Cmd+A / Ctrl+A）。展開してから選ぶことで、
+   「畳んであって見えていないものまで一緒に動く」状態を避ける。 */
+function selectAllInPhase() {
+  if (!D.phase) return;
+  expandSubtree(D.phase, 'phase');
+  var sel = {};
+  eachIn(D.phase, 'phase', function (node, kind) {
+    if (kind === 'task' || kind === 'ms') sel[node.id] = true;
+  });
+  STATE.selection = sel;
+  render();
+  toast('表示中のフェーズを全展開し、' + Object.keys(sel).length + ' 件を選んだ');
+}
 /* ==================================================================
    バーと旗のドラッグ（移動 / 伸び縮み）
 
@@ -5703,6 +6027,19 @@ function startBarDrag(ev, task, bar, layout) {
   var s0 = parseIso(task.startDate), e0 = parseIso(task.endDate);
   var cur = { s: s0, e: e0 };
   var started = false;
+  var lastDd = 0, lastDir = 1;
+
+  /* バー本体（伸び縮みの端ではない）を掴み、かつこのタスクがいまの複数選択に
+     入っていれば、選択メンバー全員をまとめて動かす。端をつまんだ伸び縮みは
+     選択に関わらずこのタスク 1 本だけを対象にする（まとめて伸び縮みはしない）。
+     選択に入っていないバーを掴んだ場合は、これまで通りこのバー 1 本だけを動かし、
+     掴んだ時点で古い複数選択は解く。 */
+  var bulk = (mode === 'move' && STATE.selection[task.id]) ? selectedMovables() : null;
+  var clearedSelection = false;
+  if (!bulk && Object.keys(STATE.selection).length) {
+    STATE.selection = {};
+    clearedSelection = true;
+  }
 
   function begin() {
     started = true;
@@ -5727,10 +6064,14 @@ function startBarDrag(ev, task, bar, layout) {
     ne = snapWorking(ne, dir);
     if (ne < ns) ne = ns;
     cur = { s: ns, e: ne };
+    lastDd = dd; lastDir = dir;
     var sx = dateToX(ns, layout);
     bar.style.left = sx + 'px';
     bar.style.width = Math.max(12, endX(ne, layout) - sx - 2) + 'px';
-    showTip(tipLines(task.name, disp(ns) + ' 〜 ' + disp(ne) + '（' + D.countWork(ns, ne) + ' 営業日）'),
+    showTip(
+      (bulk && bulk.length > 1)
+        ? tipLines(bulk.length + ' 件をまとめて移動中', disp(ns) + ' 〜 ' + disp(ne))
+        : tipLines(task.name, disp(ns) + ' 〜 ' + disp(ne) + '（' + D.countWork(ns, ne) + ' 営業日）'),
       e.clientX, e.clientY);
   }
   function cleanup() {
@@ -5743,8 +6084,20 @@ function startBarDrag(ev, task, bar, layout) {
   function onUp() {
     var wasDragging = started;
     cleanup();
-    if (!wasDragging) return;   /* クリック扱い。行の click が選択を担当する */
+    if (!wasDragging) {
+      /* クリック扱い。行の click が単体選択を担当するので、ここでは何もしない。
+         ただし、掴んだ時点で古い複数選択を解いていたら、その見た目だけは反映する。 */
+      if (clearedSelection) render();
+      return;
+    }
     CLICK_GUARD = Date.now();
+    if (bulk) {
+      if (lastDd === 0) { render(); return; }   /* 動いていない（元の位置に戻した） */
+      var added = applyBulkShift(bulk, lastDd, lastDir);
+      toast(bulk.length + ' 件の日程を、まとめて ' + disp(cur.s) + ' 〜 ' + disp(cur.e) + ' 基準にずらした' +
+        (added ? '（休みの日 ' + added + ' 日を、この計画では働く日として暦に足した）' : ''), '元に戻す', undo);
+      return;
+    }
     if (applyTaskDates(task, cur.s, cur.e)) {
       toast('「' + task.name + '」の日程を ' + disp(cur.s) + ' 〜 ' + disp(cur.e) + ' にした', '元に戻す', undo);
     } else {
@@ -5763,6 +6116,16 @@ function startMilestoneDrag(ev, ms, flag, layout) {
   var d0 = parseIso(ms.date);
   var cur = d0;
   var started = false;
+  var lastDd = 0, lastDir = 1;
+
+  /* 旗が複数選択に入っていれば、選択メンバー全員をまとめて動かす。
+     入っていなければこの旗 1 本だけを動かし、掴んだ時点で古い複数選択は解く。 */
+  var bulk = STATE.selection[ms.id] ? selectedMovables() : null;
+  var clearedSelection = false;
+  if (!bulk && Object.keys(STATE.selection).length) {
+    STATE.selection = {};
+    clearedSelection = true;
+  }
 
   function onMove(e) {
     if (!started) {
@@ -5774,7 +6137,9 @@ function startMilestoneDrag(ev, ms, flag, layout) {
       document.body.style.userSelect = 'none';
     }
     var dd = Math.round((e.clientX - x0) / ppd);
-    cur = snapWorking(addDays(d0, dd), dd < 0 ? -1 : 1);
+    var dir = dd < 0 ? -1 : 1;
+    cur = snapWorking(addDays(d0, dd), dir);
+    lastDd = dd; lastDir = dir;
     /* 追従の見た目も、確定後に描かれる位置と同じ置き方にする。
        動かしている間だけ別の場所に付くと、離した瞬間に飛んで見える。 */
     if (layout.zoom === 'day') {
@@ -5783,7 +6148,11 @@ function startMilestoneDrag(ev, ms, flag, layout) {
     } else {
       flag.style.left = msFlagX({ e: cur, date: cur }, layout) + 'px';
     }
-    showTip(tipLines(ms.name, '期日 ' + disp(cur)), e.clientX, e.clientY);
+    showTip(
+      (bulk && bulk.length > 1)
+        ? tipLines(bulk.length + ' 件をまとめて移動中', '期日 ' + disp(cur))
+        : tipLines(ms.name, '期日 ' + disp(cur)),
+      e.clientX, e.clientY);
   }
   function cleanup() {
     document.removeEventListener('mousemove', onMove);
@@ -5795,8 +6164,18 @@ function startMilestoneDrag(ev, ms, flag, layout) {
   function onUp() {
     var wasDragging = started;
     cleanup();
-    if (!wasDragging) return;
+    if (!wasDragging) {
+      if (clearedSelection) render();
+      return;
+    }
     CLICK_GUARD = Date.now();
+    if (bulk) {
+      if (lastDd === 0) { render(); return; }
+      var added = applyBulkShift(bulk, lastDd, lastDir);
+      toast(bulk.length + ' 件の日程を、まとめて期日 ' + disp(cur) + ' 基準にずらした' +
+        (added ? '（休みの日 ' + added + ' 日を、この計画では働く日として暦に足した）' : ''), '元に戻す', undo);
+      return;
+    }
     if (iso(cur) !== ms.date) {
       pushUndo();
       ms.date = iso(cur);
@@ -5808,6 +6187,108 @@ function startMilestoneDrag(ev, ms, flag, layout) {
     } else {
       render();
     }
+  }
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+}
+
+/* ==================================================================
+   範囲選択（チャートの何も無いところからのドラッグ）
+
+   バー本体・旗の mousedown はそれぞれ startBarDrag／startMilestoneDrag が
+   ev.stopPropagation() で止めているため、ここ（#ganttRight）まで
+   mousedown が届く時点で「バー・旗の上から始めたのではない」ことが
+   保証されている。始点で区別する、という仕様をイベント伝播だけで満たす形。
+
+   行の背景（バー・旗以外の場所）から始めても、動かさずに離せば
+   ただのクリックとして扱う（started のまま止まる）。この場合は行側の
+   click がこれまで通り単体選択を担当するので、ここでは何もしない
+   （render() をここで呼ぶと、click が届く前に行の DOM が入れ替わり、
+   クリックそのものが不発になる）。動いた場合だけ、ここで選択を確定する。 */
+function startRangeSelect(ev) {
+  if (ev.button !== 0) return;
+  var host = document.getElementById('ganttRight');
+  var hostRect = host.getBoundingClientRect();
+  var x0 = ev.clientX, y0 = ev.clientY;
+  var mousedownTarget = ev.target;
+  var started = false, box = null, cand = [], hits = [];
+
+  /* 候補は「個別に動かせる行」＝タスクのバーとマイルストンの旗だけ。
+     工程・フェーズ・プロジェクトの集約バー（rollup）は単独で動かせないため対象外。 */
+  function collectCandidates() {
+    var out = [];
+    var bars = host.querySelectorAll('.gantt-bar');
+    for (var i = 0; i < bars.length; i++) {
+      var row = bars[i].closest('.gantt-right-row');
+      if (row) out.push({ id: row.getAttribute('data-id'), el: bars[i] });
+    }
+    var flags = host.querySelectorAll('.gantt-milestone .flag');
+    for (var j = 0; j < flags.length; j++) {
+      var mrow = flags[j].closest('.gantt-right-row');
+      if (mrow) out.push({ id: mrow.getAttribute('data-id'), el: flags[j] });
+    }
+    return out;
+  }
+  function rectsOverlap(a, b) {
+    return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+  }
+  function begin() {
+    started = true;
+    document.body.style.userSelect = 'none';
+    box = el('div', 'range-select-box');
+    host.appendChild(box);
+    cand = collectCandidates();
+  }
+  function updateBox(e) {
+    var l = Math.min(x0, e.clientX), r = Math.max(x0, e.clientX);
+    var t = Math.min(y0, e.clientY), b = Math.max(y0, e.clientY);
+    box.style.left = (l - hostRect.left) + 'px';
+    box.style.top = (t - hostRect.top) + 'px';
+    box.style.width = (r - l) + 'px';
+    box.style.height = (b - t) + 'px';
+    hits = [];
+    var rect = { left: l, right: r, top: t, bottom: b };
+    cand.forEach(function (c) {
+      if (rectsOverlap(rect, c.el.getBoundingClientRect())) {
+        hits.push(c.id);
+        c.el.classList.add('range-hit');
+      } else {
+        c.el.classList.remove('range-hit');
+      }
+    });
+  }
+  function onMove(e) {
+    if (!started) {
+      var adx = Math.abs(e.clientX - x0), ady = Math.abs(e.clientY - y0);
+      if (adx < DRAG_THRESHOLD && ady < DRAG_THRESHOLD) return;
+      begin();
+    }
+    updateBox(e);
+  }
+  function cleanup() {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    document.body.style.userSelect = '';
+    if (box) box.remove();
+  }
+  function onUp() {
+    var wasStarted = started;
+    cleanup();
+    if (!wasStarted) {
+      /* ドラッグにならなかった＝ただのクリック。押した場所が行の上なら、
+         その行の click がこのあと単体選択を担当する（ここでは何もしない）。
+         行の外（チャートの余白）で押していたら、既存の複数選択があれば解く。 */
+      if (!mousedownTarget.closest('.gantt-right-row') && Object.keys(STATE.selection).length) {
+        STATE.selection = {};
+        render();
+      }
+      return;
+    }
+    CLICK_GUARD = Date.now();
+    var sel = {};
+    hits.forEach(function (id) { sel[id] = true; });
+    STATE.selection = sel;
+    render();
   }
   document.addEventListener('mousemove', onMove);
   document.addEventListener('mouseup', onUp);
@@ -6355,6 +6836,10 @@ function onRowKey(e) {
   if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectNode(id, true); return; }
   if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); removeNode(id); return; }
   if (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+    /* 複数選択があるときは、まとめてずらす処理（document 側の共通ハンドラ）に譲る。
+       ここで処理すると、選択に入っていない・たまたま focus が乗っているだけの
+       この 1 行しか動かなくなってしまう。 */
+    if (Object.keys(STATE.selection).length) return;
     e.preventDefault();
     var dir = e.key === 'ArrowRight' ? 1 : -1;
     if (kind === 'task') shiftTask(D.byId[id], dir, e.shiftKey);
@@ -6431,20 +6916,43 @@ function toggleTheme() {
 
 /* 印刷 / PDF:
    拡大率（STATE.zoom）と折りたたみ（STATE.expanded）は画面で選んでいる
-   状態のまま紙に出す。書き換えない。
+   状態のまま紙に出す。書き換えない。横スクロールの位置（いま画面の
+   どこを見ているか）も同じ理由で合わせない。印刷は常に全期間を対象に
+   するため（.gantt-view の overflow を visible にして横スクロールの
+   枠自体を外す。下の @media print 参照）、出す範囲は「いま画面に
+   見えている場所」ではなく「データの最初から最後まで」で固定になる。
+   画面の見えている範囲だけを出すと、スクロールで隠れている大半が紙から
+   消えてしまうため、この方針は変えない。
 
    以前はここで「全展開・全期間」に切り替えていたが、taka から
    「画面と違う単位で描画される」「畳んだ行が全部開いて出る」という
    不具合として報告された（2026-09-08）。画面表示と紙面が食い違うこと
    自体が不具合、という判断で、状態を書き換えない方針に変えた。
-   ここで行うのは「紙に出すべきでないもの」を消す調整だけ
-   （右ペイン・設定・テーマの固定など）。
+   ここで行うのは「紙に出すべきでないもの」を消す調整と、紙に収めるための
+   縮小率・用紙の向きの計算だけ（右ペイン・設定・テーマの固定など）。
 
-   ただし紙は画面と違って横に流れない。画面のタイムラインは横スクロール
-   で見る前提なので、拡大率をそのまま出すと紙の幅（A4 横 - 左右余白）を
-   超えて見切れることが普通に起きる。それを防ぐため、出力対象の実際の
-   横幅を計算し、紙幅に収まらない場合だけ .board 全体を縮小する
-   （縮小率に下限は設けない。taka との合意）。
+   ただし紙は画面と違って横にも縦にも自由に流れるわけではない
+   （縦は複数ページに流せるが、横は 1 ページの幅で折り返せない）。
+   画面のタイムラインは横スクロールで見る前提なので、拡大率をそのまま
+   出すと紙の幅（用紙の向きぶんの幅 - 左右余白）を超えて見切れることが
+   普通に起きる。それを防ぐため、出力対象の実際の横幅・縦幅を計算し、
+   必要な分だけ .board 全体を縮小する（縮小率に下限は設けない。
+   taka との合意）。
+
+   印刷確認モーダル（PRINT_OPTIONS、上のモーダル配線を参照）で
+   「収め方」（1ページに収める／読みやすさ優先）と「用紙の向き」
+   （自動／横／縦）を毎回選んでもらい、その内容に沿って縮小率と
+   向きを決める。
+     - 1ページに収める … 幅・高さの両方を紙 1 枚に収める縮小率
+       （幅に対する比率と高さに対する比率のうち小さい方）を使う
+     - 読みやすさ優先 … 従来どおり幅だけを合わせる。縦は紙送りで
+       複数ページに分かれる
+     - 向きが自動のときは、内容の形（幅・高さそれぞれの必要量）から
+       縮小率が大きくなる（＝縮小が少なく読みやすい）方を選ぶ。
+       これは収め方の選択に関わらず、常に幅と高さの両方で判定する
+       （decidePrintOrientation 参照）。向きが決まったあとで、
+       選んだ収め方に応じた縮小率を計算し直す（向きで使える幅・高さが
+       変わるため、必ず向きを先に決めてから縮小率を出す）
 
    縮小は transform: scale ではなく CSS の zoom を使う。
    transform はペイント（見た目）だけを縮小し、ページ分割は縮小前の
@@ -6459,19 +6967,121 @@ var PRINT_SNAPSHOT = null;
    と必ず一致させる。DOM 計測ではなく定数にしているのは、print 用の
    CSS が実際に効いているかを beforeprint の時点で確実には測れないため
    （ブラウザや発火タイミングによって、print 用スタイルの反映が
-   beforeprint 実行前後のどちらになるか変わり得る）。 */
+   beforeprint 実行前後のどちらになるか変わり得る）。
+   高さの計算（measurePrintMetrics）では同じ理由で、影響する要素だけ
+   一時的にインラインスタイルで print 相当の見た目を再現してから測る
+   （@media print 自体のタイミングには依存しない）。 */
 var PRINT_LEFT_WIDTH = 250;
-/* @page の値（下の @page 定義）と必ず一致させる。
-   A4 横 297mm、余白 10mm → 印刷可能幅 = 297 - 10*2 = 277mm。
-   @page のサイズや余白を変えたら、ここも合わせて直すこと。 */
-var PRINT_PAGE_MM = { width: 297, margin: 10 };
+/* A4 の長辺・短辺と余白（mm）。#printPageStyle に書き込む @page の値と
+   必ず一致させること（向きが変わっても mm 自体はここ 1 か所で決める）。 */
+var PRINT_PAGE_MM = { long: 297, short: 210, margin: 10 };
 var MM_TO_PX = 96 / 25.4;   /* CSS の 1mm = 96/25.4px 換算 */
 /* mm→px の丸め・環境差で数px はみ出す事故を避けるための安全マージン。
    見た目に影響しない小ささで、狙いは「ちょうど収まったつもりが1pxだけ
-   次ページ/次列にはみ出す」を防ぐこと。 */
+   次ページ/次列にはみ出す」を防ぐこと。高さ側は測定の対象が増える分
+   （.topbar の実測など）誤差の余地が少し広いため、幅よりわずかに大きい
+   値にしてある。 */
 var PRINT_WIDTH_SAFETY_PX = 4;
-function printAvailableWidthPx() {
-  return (PRINT_PAGE_MM.width - PRINT_PAGE_MM.margin * 2) * MM_TO_PX - PRINT_WIDTH_SAFETY_PX;
+var PRINT_HEIGHT_SAFETY_PX = 8;
+/* .wrap の @media print 側 padding（0 0 8px）。.board の外・下に付く
+   固定の縦余白なので、使える高さから差し引く。値を変えたらここも直すこと。 */
+var PRINT_WRAP_BOTTOM_PADDING_PX = 8;
+function printPageSizeMm(orientation) {
+  return orientation === 'portrait'
+    ? { width: PRINT_PAGE_MM.short, height: PRINT_PAGE_MM.long }
+    : { width: PRINT_PAGE_MM.long, height: PRINT_PAGE_MM.short };
+}
+function printAvailableWidthPx(orientation) {
+  var mm = printPageSizeMm(orientation);
+  return (mm.width - PRINT_PAGE_MM.margin * 2) * MM_TO_PX - PRINT_WIDTH_SAFETY_PX;
+}
+/* .board の外側にあって縮小されない縦の要素（.topbar と .wrap の下余白）ぶんを
+   紙の縦の使える高さから差し引く。topbarHeightPx は measurePrintMetrics() の
+   実測値を渡す。 */
+function printAvailableHeightPx(orientation, topbarHeightPx) {
+  var mm = printPageSizeMm(orientation);
+  var pageHeight = (mm.height - PRINT_PAGE_MM.margin * 2) * MM_TO_PX - PRINT_HEIGHT_SAFETY_PX;
+  return pageHeight - topbarHeightPx - PRINT_WRAP_BOTTOM_PADDING_PX;
+}
+/* 縦の縮小率計算に使う実測。「使える高さ」を出すには .board の外に残る
+   .topbar の高さと、.board 自身の中身の高さ（紙で見せる状態）の両方が要る。
+   どちらも @media print 特有の見た目（.topbar の高さ auto 化・
+   凡例や表題行の表示・編集帯や操作系の非表示など）に左右されるが、
+   @media print が beforeprint の時点で実際に反映されているかは
+   ブラウザ・タイミング依存で確実には測れない（上の PRINT_LEFT_WIDTH の
+   コメント参照）。そのため、影響する要素だけを一時的にインライン
+   スタイルで印刷時と同じ状態にしてから測り、直後に元へ戻す
+   （measurePrintMetrics 実行前後で画面の見た目は変わらない）。
+   @media print 側の該当宣言（.topbar / .topbar-right / #viewSwitch /
+   .edit-banner / .phase-strip / .doc-title / .doc-name / .doc-meta /
+   #zoomBar / #btnToday / .phase-dd-caret / .phase-dd-label /
+   .print-legend）を変えたら、ここも合わせて直すこと。 */
+function measurePrintMetrics() {
+  var topbar = document.querySelector('.topbar');
+  var board = document.querySelector('.board');
+  var phaseStrip = document.querySelector('.phase-strip');
+  var overrides = [
+    [topbar, { height: 'auto', padding: '8px 16px' }],
+    [document.querySelector('.topbar-right'), { display: 'none' }],
+    [document.getElementById('viewSwitch'), { display: 'none' }],
+    [document.querySelector('.edit-banner'), { display: 'none' }],
+    [phaseStrip, { padding: '6px 16px 6px' }],
+    [document.getElementById('schTitle'), { display: 'block', flex: '0 0 100%', fontSize: '16px', fontWeight: '700', marginBottom: '1px' }],
+    [phaseStrip ? phaseStrip.querySelector('.doc-name') : null, { display: 'flex' }],
+    [document.getElementById('schMeta'), { display: 'inline', fontSize: '12px' }],
+    [document.getElementById('zoomBar'), { display: 'none' }],
+    [document.getElementById('btnToday'), { display: 'none' }],
+    [document.getElementById('legend'), { display: 'flex', padding: '8px 16px 0' }]
+  ];
+  var ddHide = document.querySelectorAll('.phase-strip .phase-dd-caret, .phase-strip .phase-dd-label');
+  ddHide.forEach(function (el) { overrides.push([el, { display: 'none' }]); });
+
+  var saved = [];
+  overrides.forEach(function (pair) {
+    var el = pair[0], styles = pair[1];
+    if (!el) return;
+    var prev = {};
+    Object.keys(styles).forEach(function (k) { prev[k] = el.style[k]; el.style[k] = styles[k]; });
+    saved.push({ el: el, prev: prev });
+  });
+
+  var topbarHeight = topbar.getBoundingClientRect().height;
+  var boardHeight = board.getBoundingClientRect().height;
+
+  saved.forEach(function (s) {
+    Object.keys(s.prev).forEach(function (k) { s.el.style[k] = s.prev[k]; });
+  });
+
+  /* 横幅は元々ある LAYOUT.canvasWidth（データから決まる値）を使う。
+     renderRight/renderAxis が #ganttAxisRight・gantt-right-body に
+     設定する幅と同じ計算。 */
+  return {
+    boardWidth: PRINT_LEFT_WIDTH + LAYOUT.canvasWidth,
+    boardHeight: boardHeight,
+    topbarHeight: topbarHeight
+  };
+}
+/* 向きの自動判定。収め方の選択（1ページ／読みやすさ優先）に関わらず、
+   常に幅・高さ両方で「その向きなら縮小せずどこまで収まるか」を比べ、
+   縮小率が大きい（＝縮小が少ない）方を選ぶ。同点なら横のまま
+   （変更前の既定と揃える）。 */
+function decidePrintOrientation(metrics) {
+  var landScale = Math.min(
+    printAvailableWidthPx('landscape') / metrics.boardWidth,
+    printAvailableHeightPx('landscape', metrics.topbarHeight) / metrics.boardHeight
+  );
+  var portScale = Math.min(
+    printAvailableWidthPx('portrait') / metrics.boardWidth,
+    printAvailableHeightPx('portrait', metrics.topbarHeight) / metrics.boardHeight
+  );
+  return portScale > landScale ? 'portrait' : 'landscape';
+}
+/* @page の size は要素セレクタで切り替えられないため、専用の
+   <style id="printPageStyle"> の中身ごと書き換える。afterPrint() で
+   既定（横）に戻し、向きの指定が次回に残らないようにする。 */
+function setPrintPageOrientation(orientation) {
+  var style = document.getElementById('printPageStyle');
+  if (style) style.textContent = '@page { size: A4 ' + orientation + '; margin: ' + PRINT_PAGE_MM.margin + 'mm; }';
 }
 function beforePrint() {
   if (PRINT_SNAPSHOT) return;
@@ -6488,10 +7098,20 @@ function beforePrint() {
   applyViewClass();
   render();   /* 拡大率・折りたたみはここでは触らない。LAYOUT を最新化するために呼ぶだけ */
 
-  /* 出力対象（名前欄＋タイムライン）の実際の横幅。renderRight/renderAxis が
-     #ganttAxisRight・gantt-right-body に設定する幅と同じ計算（LAYOUT.canvasWidth）。 */
-  var boardWidth = PRINT_LEFT_WIDTH + LAYOUT.canvasWidth;
-  var scale = Math.min(1, printAvailableWidthPx() / boardWidth);
+  var metrics = measurePrintMetrics();
+  var orientation = PRINT_OPTIONS.orientation === 'auto'
+    ? decidePrintOrientation(metrics)
+    : PRINT_OPTIONS.orientation;
+  setPrintPageOrientation(orientation);
+
+  var availWidth = printAvailableWidthPx(orientation);
+  var scale;
+  if (PRINT_OPTIONS.fit === 'flow') {
+    scale = Math.min(1, availWidth / metrics.boardWidth);
+  } else {
+    var availHeight = printAvailableHeightPx(orientation, metrics.topbarHeight);
+    scale = Math.min(1, availWidth / metrics.boardWidth, availHeight / metrics.boardHeight);
+  }
   var board = document.querySelector('.board');
   board.style.zoom = scale < 1 ? String(scale) : '';
 }
@@ -6503,6 +7123,7 @@ function afterPrint() {
   applyViewClass();
   document.documentElement.setAttribute('data-theme', PRINT_SNAPSHOT.theme);
   document.querySelector('.board').style.zoom = '';
+  setPrintPageOrientation('landscape');
   PRINT_SNAPSHOT = null;
   render();
 }
@@ -6548,7 +7169,7 @@ paintThemeButton();
 function closeOutputMenu() { document.getElementById('outputMenu').open = false; }
 document.getElementById('miPrint').addEventListener('click', function () {
   closeOutputMenu();
-  window.print();
+  openPrintOptionsModal();
 });
 /* [ Phase 2 ここから ] 処理は繋いでいない。押されたら、まだ動かないことを知らせる。 */
 document.getElementById('miSheet').addEventListener('click', function () {
@@ -6584,6 +7205,10 @@ document.getElementById('importInput').addEventListener('change', function (e) {
   e.target.value = '';
 });
 document.getElementById('ganttView').addEventListener('scroll', syncAxisScroll);
+/* チャートの何も無いところからのドラッグで範囲選択を始める。
+   バー・旗の上から始めた mousedown はそれぞれの側で止めてあるので、
+   ここへ届く時点で範囲選択の対象と分かっている（startRangeSelect 冒頭のコメント参照）。 */
+document.getElementById('ganttRight').addEventListener('mousedown', startRangeSelect);
 
 /* 幅が変わるとボタンの寸法も変わるので、選ばれている面を測り直す。
    滑らせる必要は無いので、覚えている位置は捨ててから引き直す。 */
@@ -6614,7 +7239,7 @@ document.addEventListener('visibilitychange', function () {
    details 型のポップオーバー（POPOVERS、下）とは別の仕組み。
    閉じ方は詳細パネルと揃える（背景クリック / Escape）。同時に開くのは 1 枚だけで、
    開いている間はほかのキー操作（Ctrl+Z 等）を拾わない（キー操作は下の keydown 側）。 */
-var MODAL_IDS = ['exportConfirmModal', 'importConfirmModal', 'groupNameModal'];
+var MODAL_IDS = ['exportConfirmModal', 'importConfirmModal', 'groupNameModal', 'printOptionsModal'];
 var MODAL_RETURN_FOCUS = null;
 function openModalId() {
   for (var i = 0; i < MODAL_IDS.length; i++) {
@@ -6703,6 +7328,55 @@ document.getElementById('groupNameInput').addEventListener('keydown', function (
   if (e.key === 'Enter') { e.preventDefault(); applyGroupName(); }
 });
 
+/* 印刷確認。収め方・用紙の向きの選択は、実際の縮小率計算
+   （beforePrint 側）に PRINT_OPTIONS として渡す。
+   モーダルを経由しない印刷（OS/ブラウザのショートカット等）は
+   この画面からは止められないため、そのときは前回選んだ内容
+   （初回は既定値）で印刷される。 */
+var PRINT_OPTIONS = { fit: 'fit', orientation: 'auto' };
+function setSegActive(segEl, value) {
+  segEl.querySelectorAll('button').forEach(function (b) {
+    b.classList.toggle('active', b.getAttribute('data-value') === value);
+  });
+}
+function wirePrintOptSeg(segEl, optionKey) {
+  segEl.addEventListener('click', function (e) {
+    var btn = e.target.closest('button');
+    if (!btn) return;
+    PRINT_OPTIONS[optionKey] = btn.getAttribute('data-value');
+    setSegActive(segEl, PRINT_OPTIONS[optionKey]);
+  });
+}
+wirePrintOptSeg(document.getElementById('printFitSeg'), 'fit');
+wirePrintOptSeg(document.getElementById('printOrientSeg'), 'orientation');
+
+/* モーダルの「自動」に添える見出し（例:「自動（横）」）用。
+   実際の印刷（beforePrint）と同じ decidePrintOrientation を使うため、
+   一時的にタイムライン表示へ切り替えて測る（元の表示へ戻す）。
+   印刷そのものは行わない。 */
+function previewAutoOrientationLabel() {
+  var restoreView = STATE.view !== 'timeline' ? STATE.view : null;
+  if (restoreView) { STATE.view = 'timeline'; applyViewClass(); render(); }
+  var orientation = decidePrintOrientation(measurePrintMetrics());
+  if (restoreView) { STATE.view = restoreView; applyViewClass(); render(); }
+  return orientation;
+}
+
+function openPrintOptionsModal() {
+  /* 開くたびに既定へ戻す（taka 合意: 収め方は毎回選ぶもの）。 */
+  PRINT_OPTIONS = { fit: 'fit', orientation: 'auto' };
+  setSegActive(document.getElementById('printFitSeg'), 'fit');
+  setSegActive(document.getElementById('printOrientSeg'), 'auto');
+  document.getElementById('printAutoHint').textContent =
+    '（' + (previewAutoOrientationLabel() === 'portrait' ? '縦' : '横') + '）';
+  openModal('printOptionsModal');
+}
+document.getElementById('printOptionsCancel').addEventListener('click', closeAllModals);
+document.getElementById('printOptionsOk').addEventListener('click', function () {
+  closeAllModals();
+  window.print();
+});
+
 /* 差し込み型のパネル（いまはキーボード操作の一覧だけ）。
    外側をクリックするか Escape で閉じる。同時に 2 枚は開かない。 */
 var POPOVERS = [document.getElementById('outputMenu')];
@@ -6770,6 +7444,31 @@ document.addEventListener('keydown', function (e) {
   var inField = (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT');
   var mod = e.ctrlKey || e.metaKey;
   if (mod && (e.key === 'z' || e.key === 'Z') && !inField) { e.preventDefault(); undo(); return; }
+  /* Cmd/Ctrl+A: 表示中のフェーズを全展開してから、その中のタスク・マイルストンを
+     すべて選ぶ。テキスト入力欄の中では、その欄自身の全選択を優先する
+     （Ctrl+Z を入力欄の中では奪わないのと同じ扱い）。 */
+  if (mod && (e.key === 'a' || e.key === 'A') && !inField) {
+    e.preventDefault();
+    selectAllInPhase();
+    return;
+  }
+  /* 複数選択がある状態での Alt+矢印は、選択メンバー全員をまとめて 1 稼働日ずらす。
+     行にフォーカスが乗っていなくても効くよう、行の keydown（onRowKey）とは別に
+     ここでも見る（Cmd+A の直後は、まだどの行にも DOM フォーカスが無いことがあるため）。
+     行にフォーカスがある場合は、onRowKey 側が複数選択の有無を見て自分の分（1 行だけの
+     移動）を譲る形にしてあるので、二重には効かない。 */
+  if (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !inField) {
+    var bulkMembers = selectedMovables();
+    if (bulkMembers.length) {
+      e.preventDefault();
+      var bulkDir = e.key === 'ArrowRight' ? 1 : -1;
+      var bulkAdded = applyBulkShift(bulkMembers, bulkDir, bulkDir);
+      toast(bulkMembers.length + ' 件を' + (bulkDir > 0 ? '後ろ' : '前') + 'へ 1 稼働日ずらした' +
+        (bulkAdded ? '（休みの日 ' + bulkAdded + ' 日を、この計画では働く日として暦に足した）' : ''),
+        '元に戻す', undo);
+      return;
+    }
+  }
   if (e.key === 'Escape') {
     var open = anyPopoverOpen();
     if (open) { open.open = false; open.querySelector('summary').focus(); return; }
@@ -6783,6 +7482,9 @@ document.addEventListener('keydown', function (e) {
       return;
     }
     if (inField) { t.blur(); return; }
+    /* 複数選択の解除も Escape で。ドッキングパネル（設定・詳細）より軽い、
+       一時的な状態なのでそれらより先に見る。 */
+    if (Object.keys(STATE.selection).length) { STATE.selection = {}; render(); return; }
     if (STATE.settingsOpen) {
       toggleSettings(false);
       document.getElementById('settingsBtn').focus();
