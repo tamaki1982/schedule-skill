@@ -895,7 +895,24 @@
   }
   .gl-name .row-icon svg { display: block; }
   .gantt-left-row.lvl-task .gl-name { padding-left: 22px; }
-  .gl-name .name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* 名前は文字選択・文字ドラッグの対象から外す。名前の上から始めたドラッグは
+     並べ替え（attachRowDnd）に渡すためで、選択が残ると「ドラッグから抜けられない」
+     状態になる。引き換えに、名前をなぞってのコピーはできなくなる
+     （選ぶだけなら詳細パネルにも同じ文字列が出る）。 */
+  .gl-name .name-text {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    user-select: none; -webkit-user-select: none;
+  }
+  /* 名前のその場編集。dblclick で name-text を隠し、同じ位置に挿し込む。
+     フォームコントロールは祖先の font-size/weight を継がないので、
+     見た目を揃えるには font: inherit が要る。 */
+  .gl-name-edit {
+    flex: 1; min-width: 0; box-sizing: border-box;
+    font: inherit; color: var(--text-primary);
+    background: var(--surface-1); border: 1px solid var(--control-ink); border-radius: 4px;
+    padding: 0 4px; margin: -1px 0; line-height: 1.4;
+  }
+  .gl-name-edit:focus { outline: none; }
   .gl-meta {
     font-size: 10.5px; color: var(--text-muted);
     flex-shrink: 0; font-variant-numeric: tabular-nums;
@@ -3837,22 +3854,42 @@ function renderLeft(doc, rows) {
     /* 完了は名前に取り消し線を引く。タスクは自分の状態、
        マイルストンから上は配下からの算出（isDone）で、同じ書き方を通す。 */
     var nameCls = 'name-text' + (isDone(ref.id) ? ' done' : '');
+    var nameWrap = el('div', 'gl-name');
+    var nameSpan = el('span', nameCls, esc(ref.name));
 
     if (r.level === 'task') {
       /* タスク種別は画面では扱わない。行に出るのは名前と、あれば注意の印だけ。 */
-      row.appendChild(el('div', 'gl-name', '<span class="' + nameCls + '">' + esc(ref.name) + '</span>'));
+      nameWrap.appendChild(nameSpan);
+      row.appendChild(nameWrap);
       if (D.warn[ref.id]) row.appendChild(warnMark(D.warn[ref.id]));
     } else {
       /* 段の種類は行の高さ・文字の強さ・背景・字下げで示す。
          記号を持つのはマイルストンだけ。記号の枠ごと出さないので、
          工程の名前はそのぶん左へ出て、マイルストンとの差がむしろ広がる。 */
       var ico = levelIcon(r.level);
-      row.appendChild(el('div', 'gl-name',
-        (ico ? '<span class="row-icon">' + ico + '</span>' : '') +
-        '<span class="' + nameCls + '">' + esc(ref.name) + '</span>'));
+      if (ico) nameWrap.appendChild(el('span', 'row-icon', ico));
+      nameWrap.appendChild(nameSpan);
+      row.appendChild(nameWrap);
       if (D.warn[ref.id]) row.appendChild(warnMark(D.warn[ref.id]));
       if (r.level === 'ms') row.appendChild(el('span', 'gl-meta', disp(ref.date)));
     }
+    /* 名前は掴んで並べ替えられる（⠿ と同じ扱いで attachRowDnd に渡す）。
+       ダブルクリックはその場編集で、row 側の dblclick（詳細パネルを開いて
+       名前に寄せる）へは伝えない。名前以外での dblclick は従来どおり。
+
+       ダブルクリックの1回目・2回目はそれぞれ単体の click でもあり、
+       row の click（selectNode → render()）が先に走って行の DOM を
+       丸ごと作り直す。そのため、ここで受け取った row / nameSpan は
+       dblclick が実際に飛んでくる時点ではもう画面から外れた（差し替え済みの）
+       ものになっていることがある。差し替え後の「いまの」行を id で
+       引き直してから編集を始める。 */
+    nameSpan.addEventListener('dblclick', function (e) {
+      e.stopPropagation();
+      var liveRow = document.querySelector('.gantt-left-row[data-id="' + ref.id + '"]');
+      var liveName = liveRow && liveRow.querySelector('.gl-name .name-text');
+      if (!liveRow || !liveName) return;
+      startInlineNameEdit(liveRow, ref, liveName);
+    });
 
     /* 行の操作。追加は配下へ、削除はこの行を対象にする */
     var acts = el('span', 'gl-actions');
@@ -3877,7 +3914,7 @@ function renderLeft(doc, rows) {
     row.addEventListener('click', function () { selectNode(ref.id, true); });
     row.addEventListener('dblclick', function () { selectNode(ref.id, true, true); });
     row.addEventListener('keydown', onRowKey);
-    attachRowDnd(row, r, handle);
+    attachRowDnd(row, r, handle, nameSpan);
     left.appendChild(row);
   });
 
@@ -6296,12 +6333,18 @@ function startRangeSelect(ev) {
 
 /* ==================================================================
    行の並べ替え（HTML ドラッグ＆ドロップ）
-   掴める場所を行頭の ⠿ に限るため、draggable は掴んだ瞬間だけ立てる。
+   掴める場所は行頭の ⠿ と名前。どちらも draggable は掴んだ瞬間だけ立てる
+   （名前は user-select: none にしてあるので、掴んでも文字選択にはならない）。
    落とせるのは同じ階層・同じ親の行だけで、対象外の行には印を出さない。
+   複数選択中に名前や ⠿ を掴んだ場合も、動くのは掴んだ 1 行だけ
+   （reorder() がもともと単体しか動かさない作りで、選択はそのまま残る。
+   複数選択をまとめて動かす／解除する分岐は入れていない）。
    ================================================================== */
 var DND = { id: null };
-function attachRowDnd(row, r, handle) {
-  handle.addEventListener('mousedown', function () { row.setAttribute('draggable', 'true'); });
+function attachRowDnd(row, r, handle, nameSpan) {
+  function arm() { row.setAttribute('draggable', 'true'); }
+  handle.addEventListener('mousedown', arm);
+  if (nameSpan) nameSpan.addEventListener('mousedown', arm);
   row.addEventListener('mouseup', function () { row.setAttribute('draggable', 'false'); });
   row.addEventListener('dragstart', function (e) {
     DND.id = r.ref.id;
@@ -6340,6 +6383,55 @@ function attachRowDnd(row, r, handle) {
 function clearDropMarks() {
   var ns = document.querySelectorAll('.drop-before, .drop-after');
   for (var i = 0; i < ns.length; i++) { ns[i].classList.remove('drop-before'); ns[i].classList.remove('drop-after'); }
+}
+
+/* ==================================================================
+   名前のその場編集（ダブルクリック）
+   name-text を隠して同じ位置に input を挿し込む方式。対象はタスク・
+   マイルストン・工程の名前（左の名前欄に出る行すべて）。
+   Enter で確定、Esc で取り消し、他へのクリック（blur）でも確定する。
+   空で確定しようとした場合と、値が変わっていない場合は取り消しと同じ
+   （元の表示に戻すだけで、変更としては数えない＝undo に積まない）。
+   ここで打っているあいだ、Cmd+A・矢印・Option+矢印・Delete が行の操作
+   （全選択・折りたたみ／親へ移動・日付ずらし・行削除）へ流れないよう、
+   keydown はすべて stopPropagation で止める（onRowKey・document 側の
+   共通ハンドラのどちらにも届かせない）。 */
+function startInlineNameEdit(row, ref, nameSpan) {
+  if (row.querySelector('.gl-name-edit')) return;   /* 二重に開かない */
+  var original = ref.name;
+  var input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'gl-name-edit';
+  input.value = original;
+  input.setAttribute('aria-label', '名前を編集');
+  nameSpan.style.display = 'none';
+  nameSpan.insertAdjacentElement('afterend', input);
+  input.focus();
+  input.select();
+
+  var done = false;
+  function finish(shouldCommit) {
+    if (done) return;
+    done = true;
+    input.removeEventListener('keydown', onKeyDown);
+    input.removeEventListener('blur', onBlur);
+    input.remove();
+    nameSpan.style.display = '';
+    var v = shouldCommit ? input.value.trim() : '';
+    if (shouldCommit && v && v !== ref.name) {
+      commit(function () { ref.name = v; });
+    }
+    /* 変更なし・空文字・Esc はここで終わり。commit を通していないので
+       undo には積まれない（見た目も ref.name のまま＝元どおり）。 */
+  }
+  function onKeyDown(e) {
+    e.stopPropagation();
+    if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+  }
+  function onBlur() { finish(true); }
+  input.addEventListener('keydown', onKeyDown);
+  input.addEventListener('blur', onBlur);
 }
 
 /* ==================================================================
@@ -6817,6 +6909,13 @@ function moveFocus(delta) {
   render();
 }
 function onRowKey(e) {
+  /* 名前をその場編集中は、行そのもののキー操作（矢印での折りたたみ・移動、
+     Enter での選択、Delete での削除など）を働かせない。編集中の input は
+     すでに自分の keydown を stopPropagation しているのでここには来ないはず
+     だが、二重の安全策として同じ判定を置く（document 側の inField 判定と
+     揃える）。 */
+  var editTag = e.target && e.target.tagName;
+  if (editTag === 'INPUT' || editTag === 'TEXTAREA' || editTag === 'SELECT') return;
   var id = e.currentTarget.getAttribute('data-id');
   STATE.focusId = id;
   var kind = D.kindOf[id];
