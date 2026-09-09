@@ -831,6 +831,12 @@
     border-bottom: 0.5px solid var(--border);
     background: var(--surface-2);
     position: relative; cursor: pointer;
+    /* 行ぜんたいを文字選択の対象から外す。外さないと、⠿ や名前・日付などの
+       文字の上から始めたドラッグをブラウザが「文字の選択・ドラッグ」だと
+       解釈してしまい、並べ替え用の dragstart に渡る前に横取りされる
+       （掴んだのに動かせない不具合の原因）。その場編集の入力欄
+       （.gl-name-edit）だけは下で選択を戻す。 */
+    user-select: none; -webkit-user-select: none;
   }
   .gantt-left-row:hover { background: var(--surface-hover); }
   .gantt-left-row.lvl-stage { background: var(--band-tint); border-bottom-color: var(--border-strong); }
@@ -911,6 +917,9 @@
     font: inherit; color: var(--text-primary);
     background: var(--surface-1); border: 1px solid var(--control-ink); border-radius: 4px;
     padding: 0 4px; margin: -1px 0; line-height: 1.4;
+    /* 行ぜんたいの user-select: none をここだけ打ち消す。打ち消さないと
+       その場編集中に文字を選び直せなくなる。 */
+    user-select: text; -webkit-user-select: text;
   }
   .gl-name-edit:focus { outline: none; }
   .gl-meta {
@@ -3914,7 +3923,7 @@ function renderLeft(doc, rows) {
     row.addEventListener('click', function () { selectNode(ref.id, true); });
     row.addEventListener('dblclick', function () { selectNode(ref.id, true, true); });
     row.addEventListener('keydown', onRowKey);
-    attachRowDnd(row, r, handle, nameSpan);
+    attachRowDnd(row, r);
     left.appendChild(row);
   });
 
@@ -6333,18 +6342,30 @@ function startRangeSelect(ev) {
 
 /* ==================================================================
    行の並べ替え（HTML ドラッグ＆ドロップ）
-   掴める場所は行頭の ⠿ と名前。どちらも draggable は掴んだ瞬間だけ立てる
-   （名前は user-select: none にしてあるので、掴んでも文字選択にはならない）。
+   掴める場所は左の行ぜんたい（⠿・名前・その右の余白・字下げ・日付など）。
+   押すと別の操作が起きる部品——開閉の三角（button.gl-twisty。タスク行の
+   同名 span はボタンではないので対象外＝そこも掴める）、行の操作ボタン
+   （.gl-actions の＋／✕）、その場編集の入力欄（.gl-name-edit）——の上から
+   始めた mousedown だけは除外し、draggable を立てない。
+   draggable は掴んだ瞬間だけ立てて離したら戻す方式のまま
+   （行に常時 draggable を持たせる案もあったが、除外対象をここ1箇所の
+   判定に集約できるこちらの方が、行の中身が増えたときに直しやすい。
+   文字選択はどのみち止めてあるので、常時立てても本来ぶつからないはず
+   だが、今回は変更を最小限にする狙いで見送った）。
    落とせるのは同じ階層・同じ親の行だけで、対象外の行には印を出さない。
-   複数選択中に名前や ⠿ を掴んだ場合も、動くのは掴んだ 1 行だけ
+   複数選択中に行を掴んだ場合も、動くのは掴んだ 1 行だけ
    （reorder() がもともと単体しか動かさない作りで、選択はそのまま残る。
    複数選択をまとめて動かす／解除する分岐は入れていない）。
    ================================================================== */
 var DND = { id: null };
-function attachRowDnd(row, r, handle, nameSpan) {
-  function arm() { row.setAttribute('draggable', 'true'); }
-  handle.addEventListener('mousedown', arm);
-  if (nameSpan) nameSpan.addEventListener('mousedown', arm);
+function attachRowDnd(row, r) {
+  function isDragExcluded(target) {
+    return !!(target && target.closest && target.closest('button.gl-twisty, .gl-actions, .gl-name-edit'));
+  }
+  row.addEventListener('mousedown', function (e) {
+    if (isDragExcluded(e.target)) return;
+    row.setAttribute('draggable', 'true');
+  });
   row.addEventListener('mouseup', function () { row.setAttribute('draggable', 'false'); });
   row.addEventListener('dragstart', function (e) {
     DND.id = r.ref.id;
