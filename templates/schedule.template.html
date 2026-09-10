@@ -366,6 +366,19 @@
     background: var(--surface-sunken); color: var(--text-muted); white-space: nowrap;
   }
 
+  /* 行の名前欄の右クリックメニュー。.menu-panel / .menu-item は出力・共有メニューと
+     共用し、見た目を増やさない。違うのは開き方（クリック位置に固定表示）だけ。 */
+  .row-ctx-menu {
+    position: fixed; z-index: 55; width: 190px;
+    background: var(--surface-1);
+    border: 0.5px solid var(--border-strong);
+    border-radius: 10px;
+    box-shadow: var(--shadow-card);
+  }
+  .row-ctx-menu .menu-sep { height: 0.5px; margin: 5px 4px; background: var(--border); }
+  .row-ctx-menu .menu-item.danger { color: var(--fill-danger); }
+  .row-ctx-menu .menu-item.danger:hover { background: var(--bg-danger); }
+
   /* 画面幅いっぱいに置く。左右の余白は持たせない。 */
   .wrap { max-width: none; margin: 0; padding: 0 0 8px; }
 
@@ -1458,7 +1471,7 @@
     .hover-tip, .gantt-hover-col, .drawer, .toast, .edit-banner,
     .view-switch, .json-view, .plain-btn, .gantt-axis-left .seg, .phase-dd-menu,
     .gantt-add-row, .gantt-add-row-right, .modal, .modal-backdrop,
-    .gl-actions, .gl-handle, .bar-handle { display: none !important; }
+    .gl-actions, .gl-handle, .bar-handle, .row-ctx-menu { display: none !important; }
     /* 紙の見出しは 4 つ（表題・プロジェクト名・フェーズ名・版）。
        出力は表示中のプロジェクトとフェーズだけなので、
        どの切り口を出したのかが紙の上で分かる必要がある。
@@ -1505,15 +1518,26 @@
     .lg-swatch {
       -webkit-print-color-adjust: exact; print-color-adjust: exact;
     }
-    /* 複数選択の縁取り・沈み・件数も同じ理由（操作中の状態であって内容ではない）
-       で紙には出さない。件数は .edit-banner ごと非表示（既存）で消えるが、
-       縁取り（outline は box-shadow と違って既定で印刷されうる）と行の沈みは
-       ここで明示的に打ち消す。 */
+    /* 複数選択の縁取り・名前欄左端の線・沈み・件数も同じ理由（操作中の状態であって
+       内容ではない）で紙には出さない。件数は .edit-banner ごと非表示（既存）で消える。
+       縁取り（outline）・左端の線（box-shadow）はどちらも、既定では印刷されない
+       ことが多いだけで保証ではない。利用者が印刷設定で「背景のグラフィック」を
+       有効にしていると、既定に頼った分だけそのまま紙に出てしまう。ここでは
+       両方とも明示的に打ち消し、既定に依存しない形にする。 */
     .gantt-bar.is-selected,
     .gantt-milestone.is-selected .flag {
       outline: none !important;
     }
+    .gantt-left-row.multi-selected, .gantt-right-row.multi-selected {
+      box-shadow: none !important;
+    }
     .gantt-left-row, .gantt-right-row { opacity: 1 !important; }
+    /* 単体選択（行をクリックして詳細パネルを開いたときの行）の縁取りも同じ理由で
+       紙には出さない。詳細パネル自体はすでに .drawer ごと非表示にしているので
+       （上記）、その行だけを縁取りで示す意味が紙には無い。 */
+    .gantt-left-row.selected::after {
+      box-shadow: none !important;
+    }
     /* 土日祝の地色（--wk-*-body）は画面では主張しすぎない薄さにしてあるが、
        紙は画面よりコントラストが付きにくく、そのままだと白地に沈んで
        ほぼ見えなくなる。色相と、地色＜見出しの濃淡関係は保ったまま、
@@ -1848,6 +1872,10 @@
   <span id="toastText"></span>
   <button id="toastAction" type="button" hidden></button>
 </div>
+
+<!-- 行の名前欄を右クリックしたときの小さなメニュー（挿入2つ・削除1つ）。
+     中身は openRowContextMenu() が毎回組み直す。 -->
+<div class="row-ctx-menu menu-panel" id="rowCtxMenu" role="menu" hidden></div>
 
 <script>
 (function () {
@@ -2869,6 +2897,20 @@ function startOfWeek(d) {
   return s;
 }
 function isArray(v) { return Object.prototype.toString.call(v) === '[object Array]'; }
+/* IME（日本語入力等）の変換確定・変換取り消しで送られてくる Enter / Escape を、
+   編集の確定・破棄と区別するための判定。変換中に来る Enter で編集ごと確定・終了
+   してしまうと、変換候補を選んだ直後にもう一度ダブルクリックし直す必要が生じる
+   （変換確定と編集終了が同じキーのため、区別しないと毎回起きる）。
+   isComposing は標準仕様（KeyboardEvent.isComposing）だが、環境によっては
+   変換を確定する Enter の keydown で isComposing が正しく立たないことがあるため
+   （特に日本語 IME まわりでの既知の差異）、legacy な合図である keyCode === 229 も
+   合わせて見る。両方ともイベントから毎回読み直すだけの判定で、
+   compositionstart/compositionend を自前で持って状態管理する方式は採らない。
+   この画面は操作のたびに render() で行の DOM を丸ごと作り直すことがあり、
+   変換の途中でその要素が消えると compositionend が飛ばない環境があり得るため、
+   自前フラグ方式だと「変換中のまま」で固まるおそれがある。イベント自身から
+   都度判定するこちらのほうが、その種の固着が起きない。 */
+function isComposingKey(e) { return !!(e.isComposing || e.keyCode === 229); }
 
 /* ==================================================================
    状態
@@ -4098,6 +4140,11 @@ function renderLeft(doc, rows) {
       if (!liveRow || !liveName) return;
       startInlineNameEdit(liveRow, ref, liveName);
     });
+    /* 名前の領域だけで右クリックメニューを止める。他の場所（行の余白・操作ボタン等）
+       ではブラウザ標準のメニューを従来どおり出す。 */
+    nameWrap.addEventListener('contextmenu', function (e) {
+      openRowContextMenu(e, ref.id);
+    });
 
     /* 行の操作。追加は配下へ、削除はこの行を対象にする */
     var acts = el('span', 'gl-actions');
@@ -4669,8 +4716,11 @@ function renderLegend() {
   lg.appendChild(el('span', 'legend-item', '<span class="lg-flag">' + iconFlag(13) + '</span><span>マイルストン（期日）</span>'));
   lg.appendChild(el('span', 'legend-item', '<span class="warn-mark">⚠</span><span>期間のはみ出し</span>'));
   lg.appendChild(el('span', 'legend-sep'));
-  /* 土日祝の色は日単位でしか出さず、印刷は全体の拡大率なので紙には現れない。
-     対応表にも載せない。 */
+  /* 土日祝の色は対応表には載せない。印刷は画面で選んだ拡大率のまま刷るため、
+     日単位で刷れば色は紙にも出るが、対応表はどの拡大率でも出る。
+     日単位でしか描かれない色を、常に出る対応表に並べると条件が食い違う
+     （色の出ていない紙に「土曜 = 青」だけが並ぶ）。また、色が出ているときは
+     日付軸の曜日がすぐ上にあるので、対応表を見なくても読める。 */
   /* 紙にはホバーが無く、札も「今日」の 2 文字だけになるので、日付はここで出す。 */
   lg.appendChild(group([['today', '今日 = ' + disp(D.today)]]));
 }
@@ -4977,6 +5027,7 @@ function onJsonInput() {
 
 function applyJsonText() {
   JSONV.timer = null;
+  commitActiveInlineEdit();
   var raw = jsonTextArea().value;
   /* 崩したあと打ち直して元へ戻した場合もここへ来る。取り込みは要らないが、
      出したままの理由書きは引っ込める。 */
@@ -5690,6 +5741,7 @@ function pushUndo() {
   STATE.dirty++;
 }
 function undo() {
+  commitActiveInlineEdit();
   if (!STATE.undoStack.length) return;
   STATE.doc = JSON.parse(STATE.undoStack.pop());
   STATE.dirty = Math.max(0, STATE.dirty - 1);
@@ -5702,6 +5754,7 @@ function undo() {
    初期化・サンプル切替・ファイル読み込み・編集の破棄がすべてここを通る。
    keepPhase は「同じスケジュールを入れ直すので、見ていたフェーズは保つ」の意。 */
 function loadDocument(src, keepPhase) {
+  commitActiveInlineEdit();
   STATE.undoStack = [];
   STATE.dirty = 0;
   STATE.savedAt = null;
@@ -5821,7 +5874,22 @@ function selectNode(id, open, focusName) {
 }
 
 /* ---- 追加 ---- */
-function addChild(parentId) {
+/* 挿入位置。insertIndex を渡した場合はその位置に挿し込み、省略時は末尾に足す。
+   親をまたぐ移動の moveNode() と同じやり方（6-4 の E9 で insertIndex を足したときの
+   書き方）に揃えてあり、どちらもこの1関数を呼ぶ。 */
+function insertIntoArray(arr, node, insertIndex) {
+  if (typeof insertIndex === 'number' && insertIndex >= 0 && insertIndex <= arr.length) {
+    arr.splice(insertIndex, 0, node);
+  } else {
+    arr.push(node);
+  }
+}
+/* insertIndex を渡すと、parentId の子の配列のその位置に挿し込む（行の右クリックの
+   「上に/下に挿入」から呼ぶ）。省略時は従来どおり末尾（＋ボタン、フェーズ末尾の
+   追加行から呼ぶ）。生成そのもの（識別子の採番・既定の日付・状態など）は
+   挿入位置によらず変えない。 */
+function addChild(parentId, insertIndex) {
+  commitActiveInlineEdit();
   var parent = D.byId[parentId], ck = childKindOf(parentId), node;
   if (!ck) return;
   pushUndo();
@@ -5829,14 +5897,26 @@ function addChild(parentId) {
     node = { id: tmpId('st'), name: '新しい工程', order: parent.stages.length + 1,
       milestones: [] };
     node.milestones.push(newMilestone(D.today));
-    parent.stages.push(node);
+    if (!isArray(parent.stages)) parent.stages = [];
+    insertIntoArray(parent.stages, node, insertIndex);
   } else if (ck === 'ms') {
     node = newMilestone(D.today);
     if (!isArray(parent.milestones)) parent.milestones = [];
-    parent.milestones.push(node);
+    insertIntoArray(parent.milestones, node, insertIndex);
   } else {
-    node = newTask(parent.date ? parseIso(parent.date) : D.today);
-    parent.tasks.push(node);
+    /* parent はマイルストン。既にタスクがあれば、その中で最も早い開始日に
+       合わせる（1稼働日のタスクなので、期日を基準にすると配下の後ろの方に
+       置いたときに期日をはみ出す）。タスクがまだ無ければ、期日と同じ日でよい。 */
+    var existingTasks = isArray(parent.tasks) ? parent.tasks : [];
+    var earliestStart = null;
+    existingTasks.forEach(function (t) {
+      var sd = parseIso(t.startDate);
+      if (sd && (!earliestStart || sd < earliestStart)) earliestStart = sd;
+    });
+    var taskBase = earliestStart || (parent.date ? parseIso(parent.date) : D.today);
+    node = newTask(taskBase);
+    if (!isArray(parent.tasks)) parent.tasks = [];
+    insertIntoArray(parent.tasks, node, insertIndex);
   }
   renumber(STATE.doc);
   D = derive(STATE.doc);
@@ -5857,13 +5937,14 @@ function newMilestone(baseDate) {
   ms.tasks.push(newTask(d));
   return ms;
 }
+/* 新規タスクは常に1稼働日で作る。開始日と終了日を同じ日にしておけば、
+   置いた先のマイルストンの期日をその場ではみ出すことがない
+   （はみ出すかどうかは、どこに置くか＝baseDate の決め方の側で担保する）。 */
 function newTask(baseDate) {
   var s = snapWorking(baseDate, 1);
-  var e = s, n = 0;
-  while (n < 2) { e = snapWorking(addDays(e, 1), 1); n++; }
   return {
     id: tmpId('tk'), name: '新しいタスク', order: 1, status: 'notstarted',
-    startDate: iso(s), endDate: iso(e), durationDays: D.countWork(s, e), effortDays: 1,
+    startDate: iso(s), endDate: iso(s), durationDays: D.countWork(s, s), effortDays: 1,
     assigneeRole: '', progress: 0, parallelizable: true
   };
 }
@@ -6000,6 +6081,7 @@ function pruneDisplayDefaultsTo(display, removedIds, droppedKeys) {
   });
 }
 function removeNode(id) {
+  commitActiveInlineEdit();
   var list = siblingsOf(id);
   if (list.length <= 1) {
     toast(LEVEL_LABEL[D.kindOf[id]] + 'は 1 件以上必要なので、この行は削除できない');
@@ -6041,8 +6123,71 @@ function removeNode(id) {
   toast(msg, '元に戻す', undo);
 }
 
+/* ---- 名前欄の右クリックメニュー（挿入2つ・削除1つ） ----
+   生成・削除の中身はここでは持たない。挿入は addChild() に挿入位置を渡すだけ、
+   削除は既存の removeNode() をそのまま呼ぶ（✕ ボタンと同じ経路。削除できない
+   ときの知らせも removeNode() 側の toast に任せ、メニュー側では判定しない。
+   ✕ ボタンも同じ理由で押せなくしていないので、それに揃えた）。 */
+var ROW_CTX_OPEN = false;
+function insertSiblingRow(id, before) {
+  var parentId = D.parentOf[id];
+  if (!parentId) return;
+  var list = siblingsOf(id);
+  var idx = -1;
+  for (var i = 0; i < list.length; i++) if (list[i].id === id) idx = i;
+  if (idx < 0) return;
+  addChild(parentId, before ? idx : idx + 1);
+}
+function rowCtxItem(label, danger, onClick) {
+  var b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'menu-item' + (danger ? ' danger' : '');
+  b.setAttribute('role', 'menuitem');
+  b.textContent = label;
+  b.addEventListener('click', function () {
+    closeRowContextMenu();
+    onClick();
+  });
+  return b;
+}
+/* クリック位置を起点に開き、画面の右端・下端をはみ出す場合だけ内側へ寄せる
+   （出力・共有メニューの edge 調整と同じ考え方）。 */
+function positionRowContextMenu(menu, x, y) {
+  menu.style.left = x + 'px';
+  menu.style.top = y + 'px';
+  var r = menu.getBoundingClientRect();
+  var vw = document.documentElement.clientWidth, vh = document.documentElement.clientHeight;
+  if (r.right > vw - 8) menu.style.left = Math.max(8, vw - r.width - 8) + 'px';
+  if (r.bottom > vh - 8) menu.style.top = Math.max(8, vh - r.height - 8) + 'px';
+}
+function openRowContextMenu(e, id) {
+  var kind = D.kindOf[id];
+  var label = LEVEL_LABEL[kind];
+  if (!label) return;
+  e.preventDefault();
+  e.stopPropagation();
+  /* 同時に2枚開かない。開いているモーダル・ポップオーバーは先に閉じる。 */
+  closeAllModals();
+  closePopovers();
+  var menu = document.getElementById('rowCtxMenu');
+  menu.innerHTML = '';
+  menu.appendChild(rowCtxItem('上に' + label + 'を挿入', false, function () { insertSiblingRow(id, true); }));
+  menu.appendChild(rowCtxItem('下に' + label + 'を挿入', false, function () { insertSiblingRow(id, false); }));
+  menu.appendChild(el('div', 'menu-sep'));
+  menu.appendChild(rowCtxItem('この' + label + 'を削除', true, function () { removeNode(id); }));
+  menu.hidden = false;
+  ROW_CTX_OPEN = true;
+  positionRowContextMenu(menu, e.clientX, e.clientY);
+}
+function closeRowContextMenu() {
+  if (!ROW_CTX_OPEN) return;
+  document.getElementById('rowCtxMenu').hidden = true;
+  ROW_CTX_OPEN = false;
+}
+
 /* ---- 並べ替え（同じ親の中だけ） ---- */
 function reorder(dragId, targetId, before) {
+  commitActiveInlineEdit();
   if (dragId === targetId) return;
   if (D.kindOf[dragId] !== D.kindOf[targetId]) return;
   if (D.parentOf[dragId] !== D.parentOf[targetId]) return;
@@ -6078,6 +6223,7 @@ function childArrayFor(target, childKind) {
    狙った位置（moveNodeAtPosition）か、コンテナ行そのものへの
    ドロップなら末尾（handleContainerDrop）を渡す。 */
 function moveNode(id, newParentId, insertIndex) {
+  commitActiveInlineEdit();
   var oldParentId = D.parentOf[id];
   if (!newParentId || newParentId === oldParentId) return;
   var from = siblingsOf(id), idx = -1;
@@ -6096,11 +6242,7 @@ function moveNode(id, newParentId, insertIndex) {
   var target = D.byId[newParentId];
   var kind = D.kindOf[id];
   var arr = childArrayFor(target, kind);
-  if (typeof insertIndex === 'number' && insertIndex >= 0 && insertIndex <= arr.length) {
-    arr.splice(insertIndex, 0, node);
-  } else {
-    arr.push(node);
-  }
+  insertIntoArray(arr, node, insertIndex);
   renumber(STATE.doc);
   D = derive(STATE.doc);
   /* 別のプロジェクト・フェーズへ移した場合は、移した先を表示に切り替える。
@@ -6704,6 +6846,23 @@ function handleContainerDrop(dragId, containerId) {
    （全選択・折りたたみ／親へ移動・日付ずらし・行削除）へ流れないよう、
    keydown はすべて stopPropagation で止める（onRowKey・document 側の
    共通ハンドラのどちらにも届かせない）。 */
+/* 編集中のその場入力は、同時にはたかだか1つ。削除・並べ替え・親をまたぐ移動・
+   取り消し・設定ファイルビューの反映・ファイル読み込みなど、DOM を作り直す
+   操作の手前で必ずここを通し、開いたままの入力を先に確定させてから本体の
+   処理へ進む。
+
+   これが要る理由: 削除メニューの項目や✕ボタンはただの button 要素で、
+   環境によってはクリックしてもフォーカスが移らないことがある。その場合、
+   編集中の input がフォーカスを持ったまま render() が行の DOM を丸ごと
+   作り直すことになり、その瞬間にブラウザ側で blur が飛ぶ。この blur 起点の
+   確定はタイミング任せで、削除側の pushUndo() と別にもう1回 commit() が
+   走って取り消しスタックに無駄な1件が積まれることがある。ここで先に
+   確定・破棄を済ませておけば、その blur は起きない（input がその時点で
+   もう無いか、すでにフォーカスを失っている）。 */
+var ACTIVE_NAME_EDIT = null;
+function commitActiveInlineEdit() {
+  if (ACTIVE_NAME_EDIT) ACTIVE_NAME_EDIT.finish(true);
+}
 function startInlineNameEdit(row, ref, nameSpan) {
   if (row.querySelector('.gl-name-edit')) return;   /* 二重に開かない */
   var original = ref.name;
@@ -6723,23 +6882,44 @@ function startInlineNameEdit(row, ref, nameSpan) {
     done = true;
     input.removeEventListener('keydown', onKeyDown);
     input.removeEventListener('blur', onBlur);
+    input.removeEventListener('click', stopMouse);
+    input.removeEventListener('dblclick', stopMouse);
+    input.removeEventListener('mousedown', stopMouse);
+    if (ACTIVE_NAME_EDIT && ACTIVE_NAME_EDIT.finish === finish) ACTIVE_NAME_EDIT = null;
     input.remove();
     nameSpan.style.display = '';
     var v = shouldCommit ? input.value.trim() : '';
-    if (shouldCommit && v && v !== ref.name) {
+    /* D.byId[ref.id] が無い＝この行はもう木に残っていない
+       （commitActiveInlineEdit() で洗いきれていない経路で、先に削除だけが
+       進んでいた場合）。その場合は確定させず、破棄したのと同じ扱いにする。 */
+    if (shouldCommit && v && v !== ref.name && D.byId[ref.id]) {
       commit(function () { ref.name = v; });
     }
-    /* 変更なし・空文字・Esc はここで終わり。commit を通していないので
+    /* 変更なし・空文字・Esc・削除済みはここで終わり。commit を通していないので
        undo には積まれない（見た目も ref.name のまま＝元どおり）。 */
   }
   function onKeyDown(e) {
     e.stopPropagation();
+    /* 変換確定の Enter・変換取り消しの Escape は、編集の確定・破棄として扱わない
+       （isComposingKey 定義箇所のコメント参照）。preventDefault もしない＝
+       IME 側の処理（候補確定 / 変換取り消し）をそのまま素通しする。 */
+    if (isComposingKey(e)) return;
     if (e.key === 'Enter') { e.preventDefault(); finish(true); }
     else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
   }
   function onBlur() { finish(true); }
+  /* カーソル位置替え・単語選択など、打っている最中に input の中でクリックしても、
+     row 側の click/dblclick（selectNode → render()。行の DOM を丸ごと作り直す）へ
+     流れないようにする。流れると、打っている途中の文字で確定させられてしまい、
+     カーソルを動かしただけで編集が終わる（この画面を実際に動かして見つけた別の
+     不具合。keydown をここで止めているのと同じ理由・同じ形で塞ぐ）。 */
+  function stopMouse(e) { e.stopPropagation(); }
   input.addEventListener('keydown', onKeyDown);
   input.addEventListener('blur', onBlur);
+  input.addEventListener('click', stopMouse);
+  input.addEventListener('dblclick', stopMouse);
+  input.addEventListener('mousedown', stopMouse);
+  ACTIVE_NAME_EDIT = { id: ref.id, finish: finish };
 }
 
 /* ==================================================================
@@ -6858,6 +7038,7 @@ function readOnlyValue(text, muted) {
     esc(text === '' || text === undefined || text === null ? '（未設定）' : text));
 }
 function commit(fn) {
+  commitActiveInlineEdit();
   pushUndo();
   fn();
   renumber(STATE.doc);
@@ -6936,6 +7117,19 @@ function dateInput(node, key) {
         markExceptional(STATE.doc, parseIso(v), parseIso(v));
       }
     });
+    /* 打ち込んだ日が非稼働日のまま残ったら、その場で知らせる（消える合図）。
+       行に残る印（⚠）は derive() の C5 判定がすでに付けているので、
+       ここではトーストだけを足す。「休みの日にも置ける」がオンのときは
+       markExceptional が直前で例外稼働日に足しており D.isWorkingDay も
+       真になっているので、ここには来ない（6-5 の C5 のとおり）。
+       対象はタスクの開始日・終了日だけ。マイルストンの期日（key === 'date'）は
+       C5 の対象外なので判定しない（2-6）。 */
+    if (key === 'startDate' || key === 'endDate') {
+      var placed = parseIso(v);
+      if (placed && !D.isWorkingDay(placed)) {
+        toast(disp(placed) + ' は休みの日です');
+      }
+    }
   });
   return i;
 }
@@ -7271,6 +7465,7 @@ function handleImport(file) {
     showJsonStatus(false, 'ファイルを読み取れなかった: ' + file.name, []);
   };
   reader.onload = function () {
+    commitActiveInlineEdit();
     var raw = String(reader.result), parsed;
     try {
       parsed = JSON.parse(raw);
@@ -7664,6 +7859,7 @@ function openModal(id) {
   if (okBtn) okBtn.focus();
 }
 function closeAllModals() {
+  closeRowContextMenu();
   document.getElementById('modalBackdrop').hidden = true;
   MODAL_IDS.forEach(function (mid) { document.getElementById(mid).hidden = true; });
   if (MODAL_RETURN_FOCUS && document.body.contains(MODAL_RETURN_FOCUS)) MODAL_RETURN_FOCUS.focus();
@@ -7731,6 +7927,10 @@ function applyGroupName() {
 document.getElementById('groupNameCancel').addEventListener('click', closeAllModals);
 document.getElementById('groupNameOk').addEventListener('click', applyGroupName);
 document.getElementById('groupNameInput').addEventListener('keydown', function (e) {
+  /* 変換確定の Enter で名前を確定させない（isComposingKey 定義箇所参照）。
+     Escape はここでは扱わない。モーダルの Escape は document 側の共通ハンドラが
+     受け持っており、そちらにも同じ判定を入れてある。 */
+  if (isComposingKey(e)) return;
   if (e.key === 'Enter') { e.preventDefault(); applyGroupName(); }
 });
 
@@ -7788,6 +7988,7 @@ document.getElementById('printOptionsOk').addEventListener('click', function () 
 var POPOVERS = [document.getElementById('outputMenu')];
 function closePopovers(except) {
   POPOVERS.forEach(function (p) { if (p !== except) p.open = false; });
+  closeRowContextMenu();
 }
 function anyPopoverOpen() {
   for (var i = 0; i < POPOVERS.length; i++) if (POPOVERS[i].open) return POPOVERS[i];
@@ -7816,7 +8017,7 @@ POPOVERS.forEach(function (dt) {
    ただし、パネルを開く側の操作は外側扱いにしない。行を押したときは
    閉じるのではなく、その行に中身が入れ替わるのが期待される動きのため。
    入力中の値は、外を押した時点で先に blur が走って確定してから閉じる。 */
-var DRAWER_KEEP = '.drawer, .gantt-left-row, .gantt-right-row, .add-row-btn, .phase-dd';
+var DRAWER_KEEP = '.drawer, .gantt-left-row, .gantt-right-row, .add-row-btn, .phase-dd, .row-ctx-menu';
 
 /* 押された場所が「閉じない側」かどうかは、掴み取り（capture）の段で見る。
    行や一覧を押すと、その要素自身の処理が画面を描き直し、
@@ -7831,10 +8032,23 @@ document.addEventListener('click', function (e) {
   var open = anyPopoverOpen();
   if (open && !open.contains(e.target)) open.open = false;
 
+  if (ROW_CTX_OPEN && !document.getElementById('rowCtxMenu').contains(e.target)) {
+    closeRowContextMenu();
+  }
+
   if (!STATE.drawerOpen) return;
   if (clickBlocked()) return;                     /* バーを動かし終えた直後は閉じない */
   if (CLICK_IN_KEEP) return;
   closeDrawer();
+});
+/* 名前欄以外を右クリックしたとき（他の行の名前欄を右クリックした場合を除く）は、
+   そちらでブラウザ標準のメニューが出るので、浮いたままにならないようここで閉じる。 */
+document.addEventListener('contextmenu', function (e) {
+  if (!ROW_CTX_OPEN) return;
+  var menu = document.getElementById('rowCtxMenu');
+  if (menu.contains(e.target)) return;
+  if (e.target.closest && e.target.closest('.gl-name')) return;
+  closeRowContextMenu();
 });
 
 document.addEventListener('keydown', function (e) {
@@ -7842,7 +8056,9 @@ document.addEventListener('keydown', function (e) {
      背景へ通さない。details 型のポップオーバー（POPOVERS）とは別の仕組みなので、
      ここで最初に見て、下のチェーンより先に処理する。 */
   if (openModalId()) {
-    if (e.key === 'Escape') { e.preventDefault(); closeAllModals(); }
+    /* 変換取り消しの Escape ではモーダルを閉じない（isComposingKey 定義箇所参照）。
+       preventDefault もせず、IME 側の変換取り消しだけが起きるようにする。 */
+    if (e.key === 'Escape' && !isComposingKey(e)) { e.preventDefault(); closeAllModals(); }
     return;
   }
   /* 入力欄の中では、その欄自身の取り消しを優先する */
@@ -7862,11 +8078,21 @@ document.addEventListener('keydown', function (e) {
      行にフォーカスが乗っていなくても効くよう、行の keydown（onRowKey）とは別に
      ここでも見る（Cmd+A の直後は、まだどの行にも DOM フォーカスが無いことがあるため）。
      行にフォーカスがある場合は、onRowKey 側が複数選択の有無を見て自分の分（1 行だけの
-     移動）を譲る形にしてあるので、二重には効かない。 */
+     移動）を譲る形にしてあるので、二重には効かない。
+
+     Alt+Shift+矢印（1 行だけのときは「終了日だけ動かす＝伸び縮み」）は、
+     複数選択では対応しない。選んだバーは長さがばらばらなので、
+     「同じ量だけ伸ばす」に自然な意味が無いため（ずらすのは全員同じ量で
+     意味が通るが、伸び縮みは通らない）。ここで何もしないまま抜けると
+     キーが効かなかったように見えるので、その理由を toast で伝える。 */
   if (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !inField) {
     var bulkMembers = selectedMovables();
     if (bulkMembers.length) {
       e.preventDefault();
+      if (e.shiftKey) {
+        toast('複数選択では伸び縮み（終了日だけを動かす操作）はできない。1 件だけ選んで操作する');
+        return;
+      }
       var bulkDir = e.key === 'ArrowRight' ? 1 : -1;
       var bulkAdded = applyBulkShift(bulkMembers, bulkDir, bulkDir);
       toast(bulkMembers.length + ' 件を' + (bulkDir > 0 ? '後ろ' : '前') + 'へ 1 稼働日ずらした' +
@@ -7876,6 +8102,12 @@ document.addEventListener('keydown', function (e) {
     }
   }
   if (e.key === 'Escape') {
+    /* 変換取り消しの Escape では何もしない（isComposingKey 定義箇所参照）。
+       入力欄からフォーカスを外す（t.blur()）のも、ここで一緒に防ぐ対象。
+       変換を取り消しただけで欄の外に出されると、これも「もう一度その場編集を
+       やり直す」羽目になる名前編集の Enter と同じ種類の不具合になる。 */
+    if (isComposingKey(e)) return;
+    if (ROW_CTX_OPEN) { closeRowContextMenu(); return; }
     var open = anyPopoverOpen();
     if (open) { open.open = false; open.querySelector('summary').focus(); return; }
     var openDd = null;
